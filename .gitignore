@@ -1,4 +1,3 @@
 .streamlit/secrets.toml
-*.enc
 *.xlsx
 __pycache__/
