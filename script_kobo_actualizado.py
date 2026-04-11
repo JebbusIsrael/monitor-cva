@@ -10,11 +10,11 @@ from cryptography.fernet import Fernet
 # ─────────────────────────────────────────────
 # CONFIGURACIÓN
 # ─────────────────────────────────────────────
-TOKEN = "TU_TOKEN_AQUI"  # Reemplaza con tu token de KoboToolbox
+TOKEN = "b3c668ef9eb542be03840192e32c7a36e4ce72cd"  # Reemplaza con tu token de KoboToolbox
 
 FORM_URLS = {
-    "datos_dudas_callcenter.xlsx": "URL_CALLCENTER_AQUI",
-    "salud_kobo.xlsx": "URL_SALUD_AQUI",
+    "datos_dudas_callcenter.xlsx": "https://kobo.savethechildren.net/api/v2/assets/amGYbSxV8fX2sy7xTJut5F/export-settings/esN2rhGwBJy2aD9JF3EdZts/data.xlsx",
+    "salud_kobo.xlsx": "https://kobo.savethechildren.net/api/v2/assets/a8KGhCwvMnZHzxETUac67N/export-settings/esBKTZcgZXrCcECdPWuR5k6/data.xlsx",
 }
 
 ONEDRIVE_FOLDER = r"C:\Users\Pc\OneDrive - Save the Children International\Israel CVA & Infraestructura 2025\CVA\monitoreo de kobos para CVA"
@@ -58,6 +58,17 @@ def cifrar_y_guardar(df: pd.DataFrame, nombre_archivo: str):
         archivo.write(datos_cifrados)
 
     print(f"🔐 Archivo cifrado guardado: {nombre_enc}")
+
+    # ── NUEVO: copiar .enc al repo y subir a GitHub ──
+    ruta_repo = os.path.join(r"C:\Users\Pc\Desktop\sabad", nombre_enc)
+    import shutil
+    shutil.copy(ruta_enc, ruta_repo)
+    
+    os.chdir(r"C:\Users\Pc\Desktop\sabad")
+    os.system(f'git add {nombre_enc}')
+    os.system('git commit -m "Actualización datos cifrados"')
+    os.system('git push origin master')
+    print(f"🚀 {nombre_enc} subido a GitHub")
 
 
 # ─────────────────────────────────────────────
