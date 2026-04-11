@@ -131,11 +131,10 @@ rol = config["credentials"]["usernames"][username]["role"]
 # DESCIFRADO
 # ─────────────────────────────────────────────
 def descifrar_archivo(nombre_enc: str) -> pd.DataFrame:
-    """Lee el archivo .enc desde OneDrive y descifra en memoria."""
     clave = st.secrets["ENCRYPTION_KEY"]
     f = Fernet(clave.encode())
 
-    ruta = os.path.join(st.secrets["ONEDRIVE_FOLDER"], nombre_enc)
+    ruta = os.path.join(os.path.dirname(os.path.abspath(__file__)), nombre_enc)
 
     if not os.path.exists(ruta):
         return pd.DataFrame()
