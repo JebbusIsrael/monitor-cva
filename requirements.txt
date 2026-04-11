@@ -1,0 +1,9 @@
+streamlit
+streamlit-authenticator
+cryptography
+pandas
+plotly
+openpyxl
+pyyaml
+bcrypt
+requests
