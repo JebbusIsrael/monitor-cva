@@ -201,6 +201,29 @@ if authentication_status is None:
 rol = config["credentials"]["usernames"][username]["role"]
 
 # ─────────────────────────────────────────────
+# LOGIN
+# ─────────────────────────────────────────────
+authenticator = stauth.Authenticate(
+    config["credentials"],
+    config["cookie"]["name"],
+    config["cookie"]["key"],
+    config["cookie"]["expiry_days"],
+)
+authenticator.login(location="main")
+name = st.session_state.get("name")
+authentication_status = st.session_state.get("authentication_status")
+username = st.session_state.get("username")
+
+if authentication_status is False:
+    st.error("Usuario o contraseña incorrectos.")
+    st.stop()
+if authentication_status is None:
+    st.warning("Ingresa tus credenciales para continuar.")
+    st.stop()
+
+rol = config["credentials"]["usernames"][username]["role"]
+
+# ─────────────────────────────────────────────
 # COLUMNAS
 # ─────────────────────────────────────────────
 COL_NOMBRE = "Nombre del paciente"
@@ -531,7 +554,7 @@ def generar_pdf(df, df_cc, entidad_sel, hoy, nuevos_hoy, duplicados, casos_criti
     pdf.ln(6)
     pdf.set_font("Helvetica", "I", 8)
     pdf.set_text_color(120, 120, 120)
-    pdf.cell(0, 6, f"Generado el {fecha_larga_es(hoy)} | Monitor PTM v7.0 | Save the Children Mexico | Confidencial",
+    pdf.cell(0, 6, f"Generado el {fecha_larga_es(hoy)} | Monitor PTM v7.1 | Save the Children Mexico | Confidencial",
              ln=True, align="C")
     return bytes(pdf.output())
 
@@ -550,7 +573,7 @@ with st.sidebar:
         st.rerun()
     authenticator.logout("Cerrar sesión", "sidebar")
     st.divider()
-    st.caption("Monitor PTM v7.0\nSave the Children México")
+    st.caption("Monitor PTM v7.1\nSave the Children México")
 
 # ─────────────────────────────────────────────
 # CARGAR
@@ -617,16 +640,13 @@ if modulo == "📊 Salud / Beneficiarios":
 
     if len(nuevos_hoy) > 0:
         st.markdown(f"""<div class="alerta-nueva">🟢 <strong>{len(nuevos_hoy)} nuevos registros hoy</strong> — {fecha_es(hoy)}</div>""", unsafe_allow_html=True)
-    if len(casos_criticos) > 0:
-        st.markdown(f"""<div class="alerta-critica">🔴 <strong>{len(casos_criticos)} personas con 3+ servicios</strong> — atención prioritaria</div>""", unsafe_allow_html=True)
     if len(duplicados) > 0:
         st.markdown(f"""<div class="alerta-duplicado">⚠️ <strong>{len(duplicados)} posibles duplicados</strong> detectados</div>""", unsafe_allow_html=True)
 
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3 = st.columns(3)
     col1.metric("👥 Total", len(df))
     col2.metric("🆕 Nuevos hoy", len(nuevos_hoy))
-    col3.metric("🔴 Prioridad alta", len(casos_criticos))
-    col4.metric("⚠️ Duplicados", len(duplicados))
+    col3.metric("⚠️ Duplicados", len(duplicados))
 
     st.divider()
 
@@ -648,6 +668,7 @@ if modulo == "📊 Salud / Beneficiarios":
 
         cols_tabla = [COL_NOMBRE, COL_EDAD, COL_SEXO, COL_PAIS,
                      COL_ENTIDAD, COL_MUNICIPIO, "tarjetas_requeridas", COL_FECHA]
+        # COL_ENTIDAD ya incluido — identifica inmediatamente de qué oficina es
         for item in reversed(conteos):
             d = item["Fecha"]
             reg = df[df[COL_FECHA].dt.date == d]
@@ -747,15 +768,34 @@ if modulo == "📊 Salud / Beneficiarios":
     # ══ SECCIÓN 5: ESTADÍSTICAS GENERALES ══
     st.markdown("## 📊 Estadísticas generales")
 
-    st.markdown("#### 📈 Tendencia de registros")
+    st.markdown("#### 📈 Tendencia de registros por oficina")
     if COL_FECHA in df.columns:
-        vista = st.radio("Ver por:", ["Semana","Mes"], horizontal=True)
-        df["periodo"] = df[COL_FECHA].dt.to_period("W" if vista == "Semana" else "M").astype(str)
-        tend = df.groupby("periodo").size().reset_index(name="Registros")
-        fig_t = px.line(tend, x="periodo", y="Registros", markers=True,
-                       color_discrete_sequence=["#1f4e9c"])
-        fig_t.update_layout(xaxis_title="Período", plot_bgcolor="white")
-        st.plotly_chart(fig_t, use_container_width=True)
+        col_tend1, col_tend2 = st.columns([1, 3])
+        with col_tend1:
+            vista = st.radio("Ver por:", ["Semana", "Mes"], horizontal=False)
+            if COL_ENTIDAD in df.columns:
+                oficinas_disp = ["Todas"] + sorted(df[COL_ENTIDAD].dropna().unique().tolist())
+                oficina_tend = st.multiselect("Oficinas:", oficinas_disp[1:], default=oficinas_disp[1:3] if len(oficinas_disp) > 2 else oficinas_disp[1:])
+            else:
+                oficina_tend = []
+
+        with col_tend2:
+            df_tend = df.copy()
+            if oficina_tend and COL_ENTIDAD in df_tend.columns:
+                df_tend = df_tend[df_tend[COL_ENTIDAD].isin(oficina_tend)]
+            df_tend["periodo"] = df_tend[COL_FECHA].dt.to_period("W" if vista == "Semana" else "M").astype(str)
+
+            if COL_ENTIDAD in df_tend.columns and len(oficina_tend) > 1:
+                tend = df_tend.groupby(["periodo", COL_ENTIDAD]).size().reset_index(name="Registros")
+                fig_t = px.line(tend, x="periodo", y="Registros", color=COL_ENTIDAD,
+                               markers=True, title="Registros por oficina")
+            else:
+                tend = df_tend.groupby("periodo").size().reset_index(name="Registros")
+                fig_t = px.line(tend, x="periodo", y="Registros", markers=True,
+                               color_discrete_sequence=["#1f4e9c"])
+
+            fig_t.update_layout(xaxis_title="Período", plot_bgcolor="white", legend_title="Oficina")
+            st.plotly_chart(fig_t, use_container_width=True)
 
     st.markdown("#### 🤒 Síntomas más frecuentes")
     sint_cols = [c for c in df.columns if "Síntomas del paciente/" in c]
@@ -787,38 +827,7 @@ if modulo == "📊 Salud / Beneficiarios":
             fig_cob.update_layout(coloraxis_showscale=False, plot_bgcolor="white")
             st.plotly_chart(fig_cob, use_container_width=True)
 
-    st.markdown("#### 👨‍⚕️ Capturistas por organización")
-    if COL_MEDICO in df.columns:
-        cols_cap = [c for c in [COL_MEDICO, COL_ORG] if c in df.columns]
-        capturas = df.groupby(cols_cap).size().reset_index(name="Registros")
-        capturas = capturas.sort_values("Registros", ascending=False).head(15)
-        st.dataframe(capturas.reset_index(drop=True), use_container_width=True)
-
     st.divider()
-
-    # ── ALIADOS QUE MÁS CANALIZAN ──
-    st.markdown("#### 🤝 Aliados que más canalizan")
-    COL_ALIADO = "Seleccione la organización a la que pertenece:"
-    if COL_ALIADO in df.columns:
-        col_al1, col_al2 = st.columns(2)
-
-    with col_al1:
-        aliados = df[COL_ALIADO].value_counts().reset_index()
-        aliados.columns = ["Aliado", "Canalizaciones"]
-        fig_al = px.bar(aliados, x="Canalizaciones", y="Aliado",
-                       orientation="h",
-                       color_discrete_sequence=["#00897b"],
-                       text="Canalizaciones")
-        fig_al.update_traces(textposition="outside")
-        fig_al.update_layout(plot_bgcolor="white")
-        st.plotly_chart(fig_al, use_container_width=True)
-
-    with col_al2:
-        if COL_ENTIDAD in df.columns:
-            st.markdown("##### Por entidad")
-            cruce_aliado = df.groupby([COL_ALIADO, COL_ENTIDAD]).size().reset_index(name="Canalizaciones")
-            cruce_aliado = cruce_aliado.sort_values("Canalizaciones", ascending=False)
-            st.dataframe(cruce_aliado.reset_index(drop=True), use_container_width=True, height=300)
 
     # ══ SECCIÓN 6: TODOS LOS REGISTROS ══
     st.markdown("## 📋 Todos los registros")
@@ -930,17 +939,34 @@ elif modulo == "📞 Call Center":
         st.plotly_chart(fig_tc, use_container_width=True)
 
     st.divider()
-    st.markdown("#### 📋 Todos los casos")
+
+    # ── ÚLTIMOS 15 DÍAS DETALLE ──
+    st.markdown("#### 📋 Casos últimos 15 días — detalle por fecha y oficina")
+    if COL_FECHA in df_cc.columns:
+        fecha_corte_15 = hoy - timedelta(days=15)
+        df_cc_15 = df_cc[df_cc[COL_FECHA].dt.date >= fecha_corte_15].copy()
+        df_cc_15 = df_cc_15.sort_values(COL_FECHA, ascending=False)
+
+        cols_pii_cc = [COL_NOMBRE_CC, COL_TEL_CC]
+        cols_15 = [COL_FECHA, COL_CIUDAD_CC, COL_PROBLEMA_CC, COL_DESC_CC, COL_SOL_CC]
+        if rol in ["operator", "admin"]:
+            cols_15 = [COL_NOMBRE_CC, COL_TEL_CC] + cols_15
+            st.info("👁 Ves nombre y teléfono porque tu rol es **operator/admin**.")
+
+        cols_15_disp = [c for c in cols_15 if c in df_cc_15.columns]
+        st.caption(f"Mostrando **{len(df_cc_15)}** casos de los últimos 15 días")
+        st.dataframe(df_cc_15[cols_15_disp].reset_index(drop=True), use_container_width=True, height=400)
+
+    st.divider()
+    st.markdown("#### 📋 Todos los casos (histórico)")
     cols_excluir_cc = ["__version__","_tags","meta/rootUuid","_index",
                       "_notes","_status","_submitted_by","_validation_status"]
-    cols_pii_cc = [COL_NOMBRE_CC, COL_TEL_CC]
     todas_cc = [c for c in df_cc.columns if c not in cols_excluir_cc]
     if rol in ["operator","admin"]:
         cols_cc_ver = todas_cc
-        st.info("👁 Ves nombre y teléfono porque tu rol es **operator/admin**.")
     else:
-        cols_cc_ver = [c for c in todas_cc if c not in cols_pii_cc]
-    st.dataframe(df_cc[cols_cc_ver].reset_index(drop=True), use_container_width=True, height=400)
+        cols_cc_ver = [c for c in todas_cc if c not in [COL_NOMBRE_CC, COL_TEL_CC]]
+    st.dataframe(df_cc[cols_cc_ver].reset_index(drop=True), use_container_width=True, height=300)
 
 # ═══════════════════════════════════════════════════════
 # MÓDULO 3: MEAL & CALIDAD
