@@ -26,7 +26,48 @@ DIAS_ES = {0:"lunes",1:"martes",2:"miércoles",3:"jueves",4:"viernes",5:"sábado
 def fecha_es(d): return f"{DIAS_ES[d.weekday()]} {d.day:02d}/{d.month:02d}"
 def fecha_larga_es(d): return f"{d.day} de {MESES_ES[d.month]} de {d.year}"
 
-# Mapeo de servicios a etiquetas legibles
+# ─────────────────────────────────────────────
+# COORDENADAS MUNICIPIOS MÉXICO
+# ─────────────────────────────────────────────
+COORDENADAS_MX = {
+    "Tijuana": (32.5149, -117.0382), "Mexicali": (32.6245, -115.4523),
+    "Ensenada": (31.8667, -116.5967), "Tecate": (32.5728, -116.6269),
+    "Tapachula": (14.9000, -92.2667), "Tuxtla Gutiérrez": (16.7500, -93.1167),
+    "San Cristóbal de las Casas": (16.7370, -92.6376), "Palenque": (17.5136, -91.9820),
+    "Oaxaca de Juárez": (17.0732, -96.7266), "Oaxaca": (17.0732, -96.7266),
+    "Salina Cruz": (16.1667, -95.2000), "Juchitán": (16.4333, -95.0167),
+    "Reynosa": (26.0923, -98.2775), "Matamoros": (25.8694, -97.5044),
+    "Nuevo Laredo": (27.4769, -99.5156), "Tampico": (22.2333, -97.8667),
+    "Ciudad Victoria": (23.7369, -99.1411),
+    "Ciudad de México": (19.4326, -99.1332), "CDMX": (19.4326, -99.1332),
+    "Villahermosa": (17.9893, -92.9475), "Cárdenas": (18.0000, -93.3667),
+    "Acapulco": (16.8531, -99.8237), "Chilpancingo": (17.5500, -99.5000),
+    "Ciudad Juárez": (31.6904, -106.4245), "Chihuahua": (28.6353, -106.0889),
+    "Hermosillo": (29.0729, -110.9559), "Nogales": (31.3036, -110.9478),
+    "Culiacán": (24.7994, -107.3879), "Mazatlán": (23.2329, -106.4062),
+    "Guadalajara": (20.6597, -103.3496), "Monterrey": (25.6866, -100.3161),
+    "Veracruz": (19.1903, -96.1533), "Xalapa": (19.5438, -96.9102),
+    "Puebla": (19.0414, -98.2063), "Mérida": (20.9670, -89.6237),
+    "Cancún": (21.1619, -86.8515), "Chetumal": (18.5001, -88.3000),
+    "San Luis Potosí": (22.1500, -100.9167),
+    "Baja California": (30.8406, -115.2838), "Tamaulipas": (24.2669, -98.8363),
+    "Chiapas": (16.7569, -93.1292), "Tabasco": (17.9893, -92.9475),
+    "Guerrero": (17.4392, -100.0119), "Chihuahua (Estado)": (28.6353, -106.0889),
+}
+
+def geocodificar(lugar):
+    if not lugar or str(lugar).lower() in ["nan", "none", ""]:
+        return None
+    if lugar in COORDENADAS_MX:
+        return COORDENADAS_MX[lugar]
+    for key, coords in COORDENADAS_MX.items():
+        if key.lower() in str(lugar).lower() or str(lugar).lower() in key.lower():
+            return coords
+    return None
+
+# ─────────────────────────────────────────────
+# SERVICIOS MAP
+# ─────────────────────────────────────────────
 SERVICIO_MAP = {
     "medicamentos": "💊 Medicamentos",
     "estudios_de_laboratorio": "🧪 Laboratorio",
@@ -36,8 +77,6 @@ SERVICIO_MAP = {
     "servicios_dentales": "🦷 Dental",
     "servicios_ginecol_gicos": "👩‍⚕️ Ginecológico",
     "otros": "❓ Otro",
-    # Formato nuevo
-    "medicamentos atención de médicos especialistas": "💊🩺",
     "Medicamentos": "💊 Medicamentos",
     "Estudios de laboratorio": "🧪 Laboratorio",
     "Atención de médicos especialistas": "🩺 Especialista",
@@ -49,19 +88,14 @@ SERVICIO_MAP = {
 }
 
 def parsear_servicios(valor):
-    """Convierte el campo de servicios a lista legible independiente del formato."""
     if pd.isna(valor) or str(valor).strip() == "":
         return []
     val = str(valor).strip()
-    # Detectar formato nuevo (tiene mayúsculas y espacios reales)
     if any(s in val for s in ["Medicamentos", "Estudios de laboratorio", "Atención", "Cirugías", "Servicios"]):
-        partes = val.split(" ")
-        # Reconstruir frases
+        tokens = val.split(" ")
         resultado = []
         i = 0
-        tokens = val.split(" ")
         while i < len(tokens):
-            # Intentar matches de frases largas primero
             matched = False
             for length in [5, 4, 3, 2, 1]:
                 frase = " ".join(tokens[i:i+length])
@@ -72,19 +106,13 @@ def parsear_servicios(valor):
                     break
             if not matched:
                 i += 1
-        return list(dict.fromkeys(resultado))  # sin duplicados
+        return list(dict.fromkeys(resultado))
     else:
-        # Formato antiguo con underscores
-        partes = val.split(" ")
-        resultado = []
-        for p in partes:
-            p_clean = p.strip().lower()
-            if p_clean in SERVICIO_MAP:
-                resultado.append(SERVICIO_MAP[p_clean])
-            elif p_clean:
-                resultado.append(f"❓ {p_clean}")
-        return resultado
+        return [SERVICIO_MAP.get(p.strip().lower(), f"❓ {p.strip()}") for p in val.split(" ") if p.strip()]
 
+# ─────────────────────────────────────────────
+# ESTILOS
+# ─────────────────────────────────────────────
 st.markdown("""
 <style>
     [data-testid="stDataFrameResizable"] button[title="Download"] { display: none !important; }
@@ -95,57 +123,26 @@ st.markdown("""
     .alerta-nueva { background:#e8f5e9; border-left:4px solid #4caf50; padding:10px; border-radius:8px; margin-bottom:6px; }
     .alerta-duplicado { background:#fff3e0; border-left:4px solid #ff9800; padding:10px; border-radius:8px; margin-bottom:6px; }
     .alerta-critica { background:#fce4ec; border-left:4px solid #e53935; padding:10px; border-radius:8px; margin-bottom:6px; }
+    .cruce-card { background:#f3e5f5; border-left:4px solid #9c27b0; padding:10px; border-radius:8px; margin-bottom:6px; }
 </style>
 """, unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────
-# USUARIOS
+# USUARIOS — reemplaza los HASH con los tuyos
 # ─────────────────────────────────────────────
 config = {
     "credentials": {
         "usernames": {
-            "tijuana": {
-                "name": "Equipo Tijuana",
-                "password": "$2b$12$BhOVLaSzAurxpX3E2tBj/.nysVwxEmgds8GrN9vZDL9nLAQy0hC9u",
-                "role": "operator",
-            },
-            "oaxaca": {
-                "name": "Equipo Oaxaca",
-                "password": "$2b$12$QNoD66.3qsTDGHq6FqiR8.u2sbTNIyQzcGrEtsSqkZtH176nNw8Ke",
-                "role": "operator",
-            },
-            "cdmx": {
-                "name": "Equipo CDMX",
-                "password": "$2b$12$xp1Cn5nCKLGiZQikf0WqBeqs6crp3tPRtF9ab7S92kNPBc8Xe4TSe",
-                "role": "operator",
-            },
-            "tapachula": {
-                "name": "Equipo Tapachula",
-                "password": "$2b$12$Reco9TLppZJCBXfWbuokWOTKNSnF6WpJodfLYpiFkuMtIxVljQn3q",
-                "role": "operator",
-            },
-            "tamaulipas": {
-                "name": "Equipo Tamaulipas",
-                "password": "$2b$12$VF2x0pO2QnjXj/jDatDDVOjK3cCkBRsCLFhKFVRaP5CmmUu1SVrBC",
-                "role": "operator",
-            },
-            "tabasco": {
-                "name": "Equipo Tabasco",
-                "password": "$2b$12$8VpQpbLRQitjhh1iX0Sa/.7Bvyv8KaTxpwPC0LB6QKEgSndVvTzVa",
-                "role": "operator",
-            },
-            "Monitoreo_admin": {
-                "name": "Monitoreo",
-                "password": "$2b$12$Lquzvyq6SYH0zJp4nnVRj.KZkJ7VIp2Y0RYRphVjev3nMPmRpfERe",
-                "role": "admin",
-            },
+            "Monitoreo_admin": {"name": "Monitoreo", "password": "$2b$12$HASH_ADMIN_AQUI", "role": "admin"},
+            "tijuana": {"name": "Equipo Tijuana", "password": "$2b$12$HASH_TIJUANA_AQUI", "role": "operator"},
+            "oaxaca": {"name": "Equipo Oaxaca", "password": "$2b$12$HASH_OAXACA_AQUI", "role": "operator"},
+            "cdmx": {"name": "Equipo CDMX", "password": "$2b$12$HASH_CDMX_AQUI", "role": "operator"},
+            "tapachula": {"name": "Equipo Tapachula", "password": "$2b$12$HASH_TAPACHULA_AQUI", "role": "operator"},
+            "tamaulipas": {"name": "Equipo Tamaulipas", "password": "$2b$12$HASH_TAMAULIPAS_AQUI", "role": "operator"},
+            "tabasco": {"name": "Equipo Tabasco", "password": "$2b$12$HASH_TABASCO_AQUI", "role": "operator"},
         }
     },
-    "cookie": {
-        "expiry_days": 1,
-        "key": "monitor_cva_stc",
-        "name": "monitor_cva_cookie",
-    },
+    "cookie": {"expiry_days": 1, "key": "monitor_cva_stc", "name": "monitor_cva_cookie"},
 }
 
 # ─────────────────────────────────────────────
@@ -188,8 +185,13 @@ COL_ORG = "Nombre de la organización a la que pertenece"
 COL_ESPECIALIDAD = "Especifique el tipo de especialidad que requiere el paciente:"
 COL_OTRO_SERVICIO = "¿Cuáles?"
 COL_SERVICIOS = "Servicios que requiere el paciente:"
+COL_NOMBRE_CC = "Nombre_de_la_persona_que_llama"
+COL_TEL_CC = "N_mero_telef_nico_de_quien_llama"
+COL_CIUDAD_CC = "Ciudad"
+COL_PROBLEMA_CC = "Problema"
+COL_DESC_CC = "Descripci_n_del_problema"
+COL_SOL_CC = "Soluci_n_brindada"
 COLS_PII = [COL_NOMBRE, COL_TEL, COL_TEL2]
-META_PROYECTO = 1200
 
 # ─────────────────────────────────────────────
 # DESCIFRADO
@@ -226,15 +228,157 @@ def semaforo(n, rojo=50, amarillo=150):
     elif n < amarillo: return "amarillo", "🟡"
     else: return "verde", "🟢"
 
+def norm_tel(x):
+    return str(x).strip().replace("-","").replace(" ","").replace("+52","") if pd.notna(x) else ""
+
+def norm_nombre(x):
+    return str(x).strip().lower() if pd.notna(x) else ""
+
 # ─────────────────────────────────────────────
-# REPORTE PDF
+# MAPA DE CALOR
+# ─────────────────────────────────────────────
+def mostrar_mapa(df):
+    col_lugar = COL_MUNICIPIO if COL_MUNICIPIO in df.columns else COL_ENTIDAD
+    if col_lugar not in df.columns:
+        st.warning("No se encontró columna de municipio o entidad.")
+        return
+
+    conteo = df[col_lugar].value_counts().reset_index()
+    conteo.columns = ["Lugar", "Registros"]
+    conteo["lat"] = conteo["Lugar"].apply(lambda x: geocodificar(x)[0] if geocodificar(x) else None)
+    conteo["lon"] = conteo["Lugar"].apply(lambda x: geocodificar(x)[1] if geocodificar(x) else None)
+
+    con_coords = conteo.dropna(subset=["lat", "lon"])
+    sin_coords = conteo[conteo["lat"].isna()]
+
+    if len(con_coords) == 0:
+        st.warning("No se pudieron geocodificar los municipios.")
+        st.dataframe(conteo[["Lugar","Registros"]], use_container_width=True)
+        return
+
+    fig = px.scatter_geo(
+        con_coords,
+        lat="lat", lon="lon",
+        size="Registros",
+        color="Registros",
+        hover_name="Lugar",
+        hover_data={"Registros": True, "lat": False, "lon": False},
+        color_continuous_scale=["#4caf50", "#ffc107", "#e53935"],
+        size_max=50,
+        scope="north america",
+    )
+    fig.update_geos(
+        showcountries=True, countrycolor="lightgray",
+        showcoastlines=True, coastlinecolor="lightgray",
+        showland=True, landcolor="#f5f5f5",
+        showocean=True, oceancolor="#e3f2fd",
+        lataxis_range=[14, 33],
+        lonaxis_range=[-118, -86],
+    )
+    fig.update_layout(
+        height=500,
+        margin={"r":0,"t":30,"l":0,"b":0},
+        coloraxis_colorbar=dict(title="Casos"),
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+    if len(sin_coords) > 0:
+        with st.expander(f"⚠️ {len(sin_coords)} lugares sin ubicación en el mapa"):
+            st.dataframe(sin_coords[["Lugar","Registros"]].reset_index(drop=True), use_container_width=True)
+
+# ─────────────────────────────────────────────
+# CRUCE SALUD + CALL CENTER
+# ─────────────────────────────────────────────
+def mostrar_cruce(df_salud, df_cc, rol):
+    if df_cc.empty:
+        st.warning("Sin datos de call center disponibles.")
+        return
+
+    df_s = df_salud.copy()
+    df_c = df_cc.copy()
+
+    df_s["tel_norm"] = df_s[COL_TEL].apply(norm_tel) if COL_TEL in df_s.columns else ""
+    df_s["nom_norm"] = df_s[COL_NOMBRE].apply(norm_nombre) if COL_NOMBRE in df_s.columns else ""
+    df_c["tel_norm"] = df_c[COL_TEL_CC].apply(norm_tel) if COL_TEL_CC in df_c.columns else ""
+    df_c["nom_norm"] = df_c[COL_NOMBRE_CC].apply(norm_nombre) if COL_NOMBRE_CC in df_c.columns else ""
+
+    # Cruce por teléfono o nombre
+    tels_cc = set(df_c[df_c["tel_norm"] != ""]["tel_norm"])
+    noms_cc = set(df_c[df_c["nom_norm"] not in ["", "nan"]]["nom_norm"]) if False else set(
+        df_c["nom_norm"][df_c["nom_norm"].str.len() > 3].tolist()
+    )
+
+    mask = (
+        df_s["tel_norm"].isin(tels_cc) & (df_s["tel_norm"] != "")
+    ) | (
+        df_s["nom_norm"].isin(noms_cc) & (df_s["nom_norm"].str.len() > 3)
+    )
+
+    personas_cruce = df_s[mask]
+
+    # Métricas
+    col1, col2, col3 = st.columns(3)
+    col1.metric("👥 En base salud", len(df_s))
+    col2.metric("📞 En call center", len(df_c))
+    col3.metric("🔗 En ambas bases", len(personas_cruce))
+
+    if len(personas_cruce) == 0:
+        st.success("✅ No se encontraron personas en ambas bases.")
+        return
+
+    st.markdown(f"""<div class="cruce-card">
+        🔗 <strong>{len(personas_cruce)} personas</strong> de la base de salud también contactaron al call center.
+    </div>""", unsafe_allow_html=True)
+
+    st.divider()
+    st.markdown("#### Detalle por persona — Salud + Call Center")
+
+    for _, persona in personas_cruce.iterrows():
+        tel = persona.get("tel_norm", "")
+        nom = persona.get("nom_norm", "")
+        nombre_display = persona.get(COL_NOMBRE, "Sin nombre") if rol in ["operator","admin"] else "Beneficiario"
+        entidad = persona.get(COL_ENTIDAD, "")
+        municipio = persona.get(COL_MUNICIPIO, "")
+
+        # Casos en call center de esta persona
+        casos_cc = df_c[
+            ((df_c["tel_norm"] == tel) & (tel != "")) |
+            ((df_c["nom_norm"] == nom) & (nom != "") & (df_c["nom_norm"].str.len() > 3))
+        ]
+
+        with st.expander(f"👤 {nombre_display} — {entidad} {municipio} — {len(casos_cc)} caso(s) en call center"):
+            col_iz, col_der = st.columns(2)
+
+            with col_iz:
+                st.markdown("**📋 Perfil de salud:**")
+                datos = {}
+                for campo, col in [("Edad", COL_EDAD), ("Sexo", COL_SEXO),
+                                   ("País", COL_PAIS), ("Entidad", COL_ENTIDAD),
+                                   ("Municipio", COL_MUNICIPIO),
+                                   ("Servicios", COL_SERVICIOS)]:
+                    val = persona.get(col, "")
+                    if pd.notna(val) and str(val).strip() not in ["","nan"]:
+                        datos[campo] = val
+                for k, v in datos.items():
+                    st.caption(f"**{k}:** {v}")
+
+            with col_der:
+                st.markdown("**📞 Casos en call center:**")
+                cols_cc_ver = [c for c in [COL_PROBLEMA_CC, COL_DESC_CC,
+                                           COL_SOL_CC, COL_CIUDAD_CC, COL_FECHA]
+                              if c in casos_cc.columns]
+                if cols_cc_ver:
+                    st.dataframe(casos_cc[cols_cc_ver].reset_index(drop=True),
+                                use_container_width=True)
+
+# ─────────────────────────────────────────────
+# PDF
 # ─────────────────────────────────────────────
 def generar_pdf(df, df_cc, entidad_sel, hoy, nuevos_hoy, duplicados, casos_criticos):
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
 
-    # Header
     pdf.set_fill_color(31, 78, 156)
     pdf.set_text_color(255, 255, 255)
     pdf.set_font("Helvetica", "B", 16)
@@ -242,8 +386,6 @@ def generar_pdf(df, df_cc, entidad_sel, hoy, nuevos_hoy, duplicados, casos_criti
     pdf.set_font("Helvetica", "", 11)
     pdf.cell(0, 8, f"Reporte: {fecha_larga_es(hoy)} | Entidad: {entidad_sel}", fill=True, ln=True, align="C")
     pdf.ln(6)
-
-    # Restablecer color texto
     pdf.set_text_color(0, 0, 0)
 
     def seccion(titulo):
@@ -254,42 +396,36 @@ def generar_pdf(df, df_cc, entidad_sel, hoy, nuevos_hoy, duplicados, casos_criti
         pdf.set_text_color(0, 0, 0)
         pdf.ln(2)
 
-    def fila_kpi(label, valor):
+    def fila(label, valor):
         pdf.set_font("Helvetica", "B", 10)
         pdf.cell(80, 7, label + ":", ln=False)
         pdf.set_font("Helvetica", "", 10)
         pdf.cell(0, 7, str(valor), ln=True)
 
-    # KPIs principales
     seccion("RESUMEN OPERATIVO")
-    fila_kpi("Total registros", len(df))
-    fila_kpi("Nuevos hoy", len(nuevos_hoy))
-    fila_kpi("Casos con 3+ servicios", len(casos_criticos))
-    fila_kpi("Duplicados detectados", len(duplicados))
-    fila_kpi("Meta del proyecto", META_PROYECTO)
-    fila_kpi("% Alcance", f"{round(len(df)/META_PROYECTO*100,1)}%")
+    fila("Total registros", len(df))
+    fila("Nuevos hoy", len(nuevos_hoy))
+    fila("Con 3+ servicios", len(casos_criticos))
+    fila("Duplicados detectados", len(duplicados))
     pdf.ln(4)
 
-    # Últimos 7 días
     seccion("REGISTROS ULTIMOS 7 DIAS")
-    ultimos_7 = [(hoy - timedelta(days=i)) for i in range(6, -1, -1)]
     pdf.set_font("Helvetica", "B", 9)
     pdf.set_fill_color(220, 230, 241)
-    pdf.cell(60, 7, "Dia", border=1, fill=True)
+    pdf.cell(80, 7, "Dia", border=1, fill=True)
     pdf.cell(40, 7, "Registros", border=1, fill=True, ln=True)
     pdf.set_font("Helvetica", "", 9)
-    for d in ultimos_7:
+    for i in range(6, -1, -1):
+        d = hoy - timedelta(days=i)
         n = len(df[df[COL_FECHA].dt.date == d]) if COL_FECHA in df.columns else 0
-        pdf.cell(60, 6, fecha_es(d), border=1)
+        pdf.cell(80, 6, fecha_es(d), border=1)
         pdf.cell(40, 6, str(n), border=1, ln=True)
     pdf.ln(4)
 
-    # Demografía
     seccion("DEMOGRAFIA")
     if COL_SEXO in df.columns:
-        sexo_count = df[COL_SEXO].value_counts()
-        for sexo, total in sexo_count.items():
-            fila_kpi(str(sexo), f"{total} ({round(total/len(df)*100,1)}%)")
+        for sexo, total in df[COL_SEXO].value_counts().items():
+            fila(str(sexo), f"{total} ({round(total/len(df)*100,1)}%)")
     pdf.ln(2)
     if COL_EDAD in df.columns:
         df_e = df.copy()
@@ -298,7 +434,7 @@ def generar_pdf(df, df_cc, entidad_sel, hoy, nuevos_hoy, duplicados, casos_criti
         labels = ["0-5","6-12","13-17","18-29","30-59","60+"]
         df_e["grupo"] = pd.cut(df_e[COL_EDAD], bins=bins, labels=labels)
         for g, n in df_e["grupo"].value_counts().sort_index().items():
-            fila_kpi(f"Edad {g}", n)
+            fila(f"Edad {g}", n)
     pdf.ln(2)
     if COL_PAIS in df.columns:
         pdf.set_font("Helvetica", "B", 10)
@@ -308,7 +444,6 @@ def generar_pdf(df, df_cc, entidad_sel, hoy, nuevos_hoy, duplicados, casos_criti
             pdf.cell(0, 6, f"  {pais}: {n}", ln=True)
     pdf.ln(4)
 
-    # Servicios
     seccion("SERVICIOS REQUERIDOS - TIPO DE TARJETA")
     servicios_ind = [c for c in df.columns if "Servicios que requiere el paciente:/" in c]
     if servicios_ind:
@@ -325,46 +460,43 @@ def generar_pdf(df, df_cc, entidad_sel, hoy, nuevos_hoy, duplicados, casos_criti
                 pdf.cell(40, 6, str(int(total)), border=1, ln=True)
     pdf.ln(4)
 
-    # Cobertura por entidad
     seccion("COBERTURA POR ENTIDAD")
     if COL_ENTIDAD in df.columns:
         pdf.set_font("Helvetica", "B", 9)
         pdf.set_fill_color(220, 230, 241)
         pdf.cell(100, 7, "Entidad", border=1, fill=True)
-        pdf.cell(40, 7, "Registros", border=1, fill=True)
-        pdf.cell(40, 7, "Semaforo", border=1, fill=True, ln=True)
+        pdf.cell(30, 7, "Registros", border=1, fill=True)
+        pdf.cell(50, 7, "Semaforo", border=1, fill=True, ln=True)
         pdf.set_font("Helvetica", "", 9)
         for entidad, n in df[COL_ENTIDAD].value_counts().items():
-            _, emoji_text = semaforo(n)
+            _, e = semaforo(n)
             nivel = "VERDE >150" if n >= 150 else ("AMARILLO 50-150" if n >= 50 else "ROJO <50")
             pdf.cell(100, 6, str(entidad), border=1)
-            pdf.cell(40, 6, str(n), border=1)
-            pdf.cell(40, 6, nivel, border=1, ln=True)
+            pdf.cell(30, 6, str(n), border=1)
+            pdf.cell(50, 6, nivel, border=1, ln=True)
     pdf.ln(4)
 
-    # Call Center
     if not df_cc.empty:
         seccion("CALL CENTER")
-        cc_hoy = df_cc[df_cc[COL_FECHA].dt.date == hoy] if COL_FECHA in df_cc.columns else pd.DataFrame()
-        fila_kpi("Total casos", len(df_cc))
-        fila_kpi("Casos hoy", len(cc_hoy))
-        problemas_cols = [c for c in df_cc.columns if c.startswith("Problema/")]
-        if problemas_cols:
+        cc_hoy_n = len(df_cc[df_cc[COL_FECHA].dt.date == hoy]) if COL_FECHA in df_cc.columns else 0
+        fila("Total casos", len(df_cc))
+        fila("Casos hoy", cc_hoy_n)
+        prob_cols = [c for c in df_cc.columns if c.startswith("Problema/")]
+        if prob_cols:
             pdf.set_font("Helvetica", "B", 10)
             pdf.cell(0, 7, "Tipos de problema:", ln=True)
             pdf.set_font("Helvetica", "", 9)
-            for col in problemas_cols:
-                nombre = col.replace("Problema/", "").replace("_", " ").strip()
+            for col in prob_cols:
+                nombre = col.replace("Problema/","").replace("_"," ").strip()
                 total = contar_sel(df_cc[col])
                 if total > 0:
                     pdf.cell(0, 6, f"  {nombre}: {total}", ln=True)
 
-    # Footer
     pdf.ln(6)
     pdf.set_font("Helvetica", "I", 8)
     pdf.set_text_color(120, 120, 120)
-    pdf.cell(0, 6, f"Generado el {fecha_larga_es(hoy)} | Monitor PTM v6.0 | Save the Children Mexico | Confidencial", ln=True, align="C")
-
+    pdf.cell(0, 6, f"Generado el {fecha_larga_es(hoy)} | Monitor PTM v7.0 | Save the Children Mexico | Confidencial",
+             ln=True, align="C")
     return bytes(pdf.output())
 
 # ─────────────────────────────────────────────
@@ -382,7 +514,7 @@ with st.sidebar:
         st.rerun()
     authenticator.logout("Cerrar sesión", "sidebar")
     st.divider()
-    st.caption("Monitor PTM v6.0\nSave the Children México")
+    st.caption("Monitor PTM v7.0\nSave the Children México")
 
 # ─────────────────────────────────────────────
 # CARGAR
@@ -426,16 +558,13 @@ if modulo == "📊 Salud / Beneficiarios":
 
     # Servicios
     servicios_ind = [c for c in df.columns if "Servicios que requiere el paciente:/" in c]
-
-    def es_sel(x):
-        return pd.notna(x) and str(x).strip() not in ['','0','nan','False','0.0']
+    def es_sel(x): return pd.notna(x) and str(x).strip() not in ['','0','nan','False','0.0']
 
     if servicios_ind:
         df["num_servicios"] = df[servicios_ind].apply(lambda r: sum(es_sel(v) for v in r), axis=1)
     else:
         df["num_servicios"] = 0
 
-    # Columna de servicios legible
     if COL_SERVICIOS in df.columns:
         df["tarjetas_requeridas"] = df[COL_SERVICIOS].apply(
             lambda x: " | ".join(parsear_servicios(x)) if pd.notna(x) else ""
@@ -457,12 +586,11 @@ if modulo == "📊 Salud / Beneficiarios":
     if len(duplicados) > 0:
         st.markdown(f"""<div class="alerta-duplicado">⚠️ <strong>{len(duplicados)} posibles duplicados</strong> detectados</div>""", unsafe_allow_html=True)
 
-    col1, col2, col3, col4, col5 = st.columns(5)
+    col1, col2, col3, col4 = st.columns(4)
     col1.metric("👥 Total", len(df))
     col2.metric("🆕 Nuevos hoy", len(nuevos_hoy))
     col3.metric("🔴 Prioridad alta", len(casos_criticos))
     col4.metric("⚠️ Duplicados", len(duplicados))
-    col5.metric("🎯 Alcance", f"{round(len(df_salud)/META_PROYECTO*100,1)}%")
 
     st.divider()
 
@@ -475,7 +603,6 @@ if modulo == "📊 Salud / Beneficiarios":
                     "Hoy": d == hoy} for d in ultimos_7]
         df_dias = pd.DataFrame(conteos)
         colores = ["#4caf50" if r else "#1f4e9c" for r in df_dias["Hoy"]]
-
         fig_dias = go.Figure(go.Bar(
             x=df_dias["Día"], y=df_dias["Registros"],
             marker_color=colores, text=df_dias["Registros"], textposition="outside"
@@ -483,10 +610,8 @@ if modulo == "📊 Salud / Beneficiarios":
         fig_dias.update_layout(showlegend=False, plot_bgcolor="white", height=280)
         st.plotly_chart(fig_dias, use_container_width=True)
 
-        # Expandibles por día
         cols_tabla = [COL_NOMBRE, COL_EDAD, COL_SEXO, COL_PAIS,
                      COL_ENTIDAD, COL_MUNICIPIO, "tarjetas_requeridas", COL_FECHA]
-
         for item in reversed(conteos):
             d = item["Fecha"]
             reg = df[df[COL_FECHA].dt.date == d]
@@ -495,64 +620,63 @@ if modulo == "📊 Salud / Beneficiarios":
                 if len(reg) == 0:
                     st.info("Sin registros este día.")
                 else:
-                    if rol in ["operator", "admin"]:
-                        cols_ver = [c for c in cols_tabla if c in reg.columns]
-                    else:
-                        cols_ver = [c for c in cols_tabla if c in reg.columns and c not in COLS_PII]
+                    cols_ver = [c for c in cols_tabla if c in reg.columns]
+                    if rol not in ["operator","admin"]:
+                        cols_ver = [c for c in cols_ver if c not in COLS_PII]
                     st.dataframe(reg[cols_ver].reset_index(drop=True), use_container_width=True)
 
     st.divider()
 
     # ══ SECCIÓN 2: SERVICIOS Y TARJETA ══
     st.markdown("## 💳 Servicios requeridos — Tipo de tarjeta")
-
     col_s1, col_s2 = st.columns(2)
     with col_s1:
         if servicios_ind:
             serv_data = {c.split("/")[-1].strip(): contar_sel(df[c]) for c in servicios_ind}
-            df_serv = pd.DataFrame(list(serv_data.items()), columns=["Servicio", "Personas"])
+            df_serv = pd.DataFrame(list(serv_data.items()), columns=["Servicio","Personas"])
             df_serv = df_serv[df_serv["Personas"] > 0].sort_values("Personas")
             fig_sv = px.bar(df_serv, x="Personas", y="Servicio", orientation="h",
-                           color_discrete_sequence=["#1f4e9c"],
-                           title="Personas por tipo de tarjeta")
+                           color_discrete_sequence=["#1f4e9c"])
             st.plotly_chart(fig_sv, use_container_width=True)
             st.caption("⚠️ Una persona puede requerir varios tipos.")
 
     with col_s2:
-        # Distribución combinaciones más comunes
         if COL_SERVICIOS in df.columns:
             combos = df["tarjetas_requeridas"].value_counts().head(8).reset_index()
             combos.columns = ["Combinación de servicios", "Personas"]
             st.markdown("##### Combinaciones más frecuentes")
             st.dataframe(combos, use_container_width=True, height=300)
 
-    # Campo Otro
     if COL_OTRO_SERVICIO in df.columns:
         otros = df[COL_OTRO_SERVICIO].dropna()
-        otros = otros[otros.astype(str).str.strip().str.lower().isin(["nan",""])==False]
+        otros = otros[~otros.astype(str).str.strip().str.lower().isin(["nan",""])]
         if len(otros) > 0:
             st.markdown("##### ❓ Detalle de 'Otro' servicio")
             st.dataframe(otros.value_counts().reset_index().rename(
-                columns={"index": "Descripción", COL_OTRO_SERVICIO: "Frecuencia"}
+                columns={"index":"Descripción", COL_OTRO_SERVICIO:"Frecuencia"}
             ), use_container_width=True)
 
-    # Especialidad
     if COL_ESPECIALIDAD in df.columns:
         esp = df[COL_ESPECIALIDAD].dropna()
-        esp = esp[esp.astype(str).str.strip().str.lower().isin(["nan",""])==False]
+        esp = esp[~esp.astype(str).str.strip().str.lower().isin(["nan",""])]
         if len(esp) > 0:
             st.markdown("##### 🩺 Especialidades requeridas")
             esp_count = esp.value_counts().reset_index()
-            esp_count.columns = ["Especialidad", "Personas"]
+            esp_count.columns = ["Especialidad","Personas"]
             fig_esp = px.bar(esp_count.head(10), x="Personas", y="Especialidad",
                             orientation="h", color_discrete_sequence=["#9c27b0"])
             st.plotly_chart(fig_esp, use_container_width=True)
 
     st.divider()
 
-    # ══ SECCIÓN 3: DEMOGRAFÍA ══
-    st.markdown("## 👥 Análisis demográfico")
+    # ══ SECCIÓN 3: MAPA DE CALOR ══
+    st.markdown("## 🗺️ Mapa de calor — distribución geográfica")
+    mostrar_mapa(df)
 
+    st.divider()
+
+    # ══ SECCIÓN 4: DEMOGRAFÍA ══
+    st.markdown("## 👥 Análisis demográfico")
     col_a, col_b, col_c = st.columns(3)
     with col_a:
         st.markdown("#### Sexo")
@@ -577,20 +701,19 @@ if modulo == "📊 Salud / Beneficiarios":
         st.markdown("#### Nacionalidad")
         if COL_PAIS in df.columns:
             pais_c = df[COL_PAIS].value_counts().head(8).reset_index()
-            pais_c.columns = ["País", "Total"]
+            pais_c.columns = ["País","Total"]
             fig3 = px.bar(pais_c, x="Total", y="País", orientation="h",
                          color_discrete_sequence=["#607d8b"])
             st.plotly_chart(fig3, use_container_width=True)
 
     st.divider()
 
-    # ══ SECCIÓN 4: ESTADÍSTICAS GENERALES ══
+    # ══ SECCIÓN 5: ESTADÍSTICAS GENERALES ══
     st.markdown("## 📊 Estadísticas generales")
 
-    # Tendencia
     st.markdown("#### 📈 Tendencia de registros")
     if COL_FECHA in df.columns:
-        vista = st.radio("Ver por:", ["Semana", "Mes"], horizontal=True)
+        vista = st.radio("Ver por:", ["Semana","Mes"], horizontal=True)
         df["periodo"] = df[COL_FECHA].dt.to_period("W" if vista == "Semana" else "M").astype(str)
         tend = df.groupby("periodo").size().reset_index(name="Registros")
         fig_t = px.line(tend, x="periodo", y="Registros", markers=True,
@@ -598,12 +721,20 @@ if modulo == "📊 Salud / Beneficiarios":
         fig_t.update_layout(xaxis_title="Período", plot_bgcolor="white")
         st.plotly_chart(fig_t, use_container_width=True)
 
-    # Semáforo
+    st.markdown("#### 🤒 Síntomas más frecuentes")
+    sint_cols = [c for c in df.columns if "Síntomas del paciente/" in c]
+    if sint_cols:
+        sint_data = {c.split("/")[-1].strip(): contar_sel(df[c]) for c in sint_cols}
+        df_sint = pd.DataFrame(list(sint_data.items()), columns=["Síntoma","Total"])
+        df_sint = df_sint[df_sint["Total"] > 0].sort_values("Total", ascending=False)
+        fig_s = px.bar(df_sint, x="Síntoma", y="Total", color_discrete_sequence=["#ff5722"])
+        st.plotly_chart(fig_s, use_container_width=True)
+
     st.markdown("#### 🚦 Cobertura por entidad")
     if COL_ENTIDAD in df_salud.columns:
         cob = df_salud[COL_ENTIDAD].value_counts().reset_index()
-        cob.columns = ["Entidad", "Registros"]
-        col_sem1, col_sem2 = st.columns([1, 2])
+        cob.columns = ["Entidad","Registros"]
+        col_sem1, col_sem2 = st.columns([1,2])
         with col_sem1:
             for _, row in cob.iterrows():
                 nivel, emoji = semaforo(row["Registros"])
@@ -620,17 +751,6 @@ if modulo == "📊 Salud / Beneficiarios":
             fig_cob.update_layout(coloraxis_showscale=False, plot_bgcolor="white")
             st.plotly_chart(fig_cob, use_container_width=True)
 
-    # Síntomas
-    st.markdown("#### 🤒 Síntomas más frecuentes")
-    sint_cols = [c for c in df.columns if "Síntomas del paciente/" in c]
-    if sint_cols:
-        sint_data = {c.split("/")[-1].strip(): contar_sel(df[c]) for c in sint_cols}
-        df_sint = pd.DataFrame(list(sint_data.items()), columns=["Síntoma", "Total"])
-        df_sint = df_sint[df_sint["Total"] > 0].sort_values("Total", ascending=False)
-        fig_s = px.bar(df_sint, x="Síntoma", y="Total", color_discrete_sequence=["#ff5722"])
-        st.plotly_chart(fig_s, use_container_width=True)
-
-    # Capturista + organización
     st.markdown("#### 👨‍⚕️ Capturistas por organización")
     if COL_MEDICO in df.columns:
         cols_cap = [c for c in [COL_MEDICO, COL_ORG] if c in df.columns]
@@ -640,34 +760,25 @@ if modulo == "📊 Salud / Beneficiarios":
 
     st.divider()
 
-    # ══ SECCIÓN 5: TODOS LOS REGISTROS ══
+    # ══ SECCIÓN 6: TODOS LOS REGISTROS ══
     st.markdown("## 📋 Todos los registros")
-
-    # Columnas a mostrar — todas las del Excel relevantes
-    cols_excluir_siempre = ["__version__", "_tags", "meta/rootUuid", "_index",
-                           "_notes", "_status", "_submitted_by", "_validation_status"]
-    todas_cols = [c for c in df.columns if c not in cols_excluir_siempre]
-
-    if rol in ["operator", "admin"]:
+    cols_excluir = ["__version__","_tags","meta/rootUuid","_index",
+                   "_notes","_status","_submitted_by","_validation_status"]
+    todas_cols = [c for c in df.columns if c not in cols_excluir]
+    if rol in ["operator","admin"]:
         cols_ver = todas_cols
         st.info("👁 Ves todos los datos incluyendo nombre y teléfono.")
     else:
         cols_ver = [c for c in todas_cols if c not in COLS_PII]
-
-    st.dataframe(
-        df[cols_ver].reset_index(drop=True),
-        use_container_width=True,
-        height=450
-    )
+    st.dataframe(df[cols_ver].reset_index(drop=True), use_container_width=True, height=450)
 
     st.divider()
 
-    # ══ DUPLICADOS ══
     st.markdown("#### 🔍 Duplicados detectados")
     if len(duplicados) > 0:
         st.warning(f"⚠️ **{len(duplicados)}** registros con mismo nombre y teléfono.")
         cols_dup = [c for c in [COL_NOMBRE, COL_TEL, COL_ENTIDAD, COL_FECHA] if c in duplicados.columns]
-        if rol not in ["operator", "admin"]:
+        if rol not in ["operator","admin"]:
             cols_dup = [c for c in cols_dup if c not in COLS_PII]
         st.dataframe(duplicados[cols_dup].reset_index(drop=True), use_container_width=True)
     else:
@@ -675,7 +786,6 @@ if modulo == "📊 Salud / Beneficiarios":
 
     st.divider()
 
-    # ══ REPORTE PDF ══
     st.markdown("#### 📄 Descargar reporte PDF")
     st.caption(f"Entidad: **{entidad_sel}** — Sin datos personales.")
     pdf_bytes = generar_pdf(df, df_cc, entidad_sel, hoy, nuevos_hoy, duplicados, casos_criticos)
@@ -708,20 +818,22 @@ elif modulo == "📞 Call Center":
     col1, col2, col3 = st.columns(3)
     col1.metric("📋 Total casos", len(df_cc))
     col2.metric("🆕 Casos hoy", len(cc_hoy))
-    if "Ciudad" in df_cc.columns:
-        col3.metric("🏙 Ciudades", df_cc["Ciudad"].nunique())
+    if COL_CIUDAD_CC in df_cc.columns:
+        col3.metric("🏙 Ciudades", df_cc[COL_CIUDAD_CC].nunique())
 
     st.divider()
 
     st.markdown("#### 📆 Casos últimos 7 días")
     if COL_FECHA in df_cc.columns:
         ultimos_7 = [(hoy - timedelta(days=i)) for i in range(6, -1, -1)]
-        conteos_cc = [{"Día": fecha_es(d), "Casos": len(df_cc[df_cc[COL_FECHA].dt.date == d]), "Hoy": d == hoy}
-                      for d in ultimos_7]
+        conteos_cc = [{"Día": fecha_es(d),
+                       "Casos": len(df_cc[df_cc[COL_FECHA].dt.date == d]),
+                       "Hoy": d == hoy} for d in ultimos_7]
         df_cc_dias = pd.DataFrame(conteos_cc)
         colores_cc = ["#4caf50" if r else "#1f4e9c" for r in df_cc_dias["Hoy"]]
         fig_cc = go.Figure(go.Bar(x=df_cc_dias["Día"], y=df_cc_dias["Casos"],
-                                  marker_color=colores_cc, text=df_cc_dias["Casos"], textposition="outside"))
+                                  marker_color=colores_cc, text=df_cc_dias["Casos"],
+                                  textposition="outside"))
         fig_cc.update_layout(showlegend=False, plot_bgcolor="white", height=280)
         st.plotly_chart(fig_cc, use_container_width=True)
 
@@ -732,17 +844,20 @@ elif modulo == "📞 Call Center":
         st.markdown("#### 🔖 Tipos de problema")
         problemas_cols = [c for c in df_cc.columns if c.startswith("Problema/")]
         if problemas_cols:
-            prob_data = {c.replace("Problema/","").replace("_"," ").strip(): contar_sel(df_cc[c]) for c in problemas_cols}
+            prob_data = {c.replace("Problema/","").replace("_"," ").strip(): contar_sel(df_cc[c])
+                        for c in problemas_cols}
             df_prob = pd.DataFrame(list(prob_data.items()), columns=["Problema","Total"])
             df_prob = df_prob[df_prob["Total"] > 0].sort_values("Total")
-            fig_p = px.bar(df_prob, x="Total", y="Problema", orientation="h", color_discrete_sequence=["#1f4e9c"])
+            fig_p = px.bar(df_prob, x="Total", y="Problema", orientation="h",
+                          color_discrete_sequence=["#1f4e9c"])
             st.plotly_chart(fig_p, use_container_width=True)
 
     with col_b:
         st.markdown("#### 🏙 Por ciudad")
-        if "Ciudad" in df_cc.columns:
-            ciudad = df_cc["Ciudad"].value_counts().head(10).reset_index()
-            fig_c = px.bar(ciudad, x="count", y="Ciudad", orientation="h", color_discrete_sequence=["#e91e8c"])
+        if COL_CIUDAD_CC in df_cc.columns:
+            ciudad = df_cc[COL_CIUDAD_CC].value_counts().head(10).reset_index()
+            fig_c = px.bar(ciudad, x="count", y=COL_CIUDAD_CC, orientation="h",
+                          color_discrete_sequence=["#e91e8c"])
             st.plotly_chart(fig_c, use_container_width=True)
 
     if COL_FECHA in df_cc.columns:
@@ -750,13 +865,15 @@ elif modulo == "📞 Call Center":
         vista_cc = st.radio("Ver por:", ["Semana","Mes"], horizontal=True, key="cc_tend")
         df_cc["periodo"] = df_cc[COL_FECHA].dt.to_period("W" if vista_cc == "Semana" else "M").astype(str)
         tend_cc = df_cc.groupby("periodo").size().reset_index(name="Casos")
-        fig_tc = px.line(tend_cc, x="periodo", y="Casos", markers=True, color_discrete_sequence=["#1f4e9c"])
+        fig_tc = px.line(tend_cc, x="periodo", y="Casos", markers=True,
+                        color_discrete_sequence=["#1f4e9c"])
         st.plotly_chart(fig_tc, use_container_width=True)
 
     st.divider()
     st.markdown("#### 📋 Todos los casos")
-    cols_excluir_cc = ["__version__","_tags","meta/rootUuid","_index","_notes","_status","_submitted_by","_validation_status"]
-    cols_pii_cc = ["Nombre_de_la_persona_que_llama","N_mero_telef_nico_de_quien_llama"]
+    cols_excluir_cc = ["__version__","_tags","meta/rootUuid","_index",
+                      "_notes","_status","_submitted_by","_validation_status"]
+    cols_pii_cc = [COL_NOMBRE_CC, COL_TEL_CC]
     todas_cc = [c for c in df_cc.columns if c not in cols_excluir_cc]
     if rol in ["operator","admin"]:
         cols_cc_ver = todas_cc
@@ -766,7 +883,7 @@ elif modulo == "📞 Call Center":
     st.dataframe(df_cc[cols_cc_ver].reset_index(drop=True), use_container_width=True, height=400)
 
 # ═══════════════════════════════════════════════════════
-# MÓDULO 3: MEAL
+# MÓDULO 3: MEAL & CALIDAD
 # ═══════════════════════════════════════════════════════
 elif modulo == "📋 MEAL & Calidad":
     st.markdown(f"""
@@ -779,38 +896,12 @@ elif modulo == "📋 MEAL & Calidad":
         st.warning("Sin datos disponibles aún.")
         st.stop()
 
-    alcance = round(len(df_salud)/META_PROYECTO*100, 1)
-    col1, col2, col3 = st.columns(3)
-    col1.metric("🎯 Meta", META_PROYECTO)
-    col2.metric("👥 Registrados", len(df_salud))
-    col3.metric("📊 Alcance", f"{alcance}%")
-
-    fig_gauge = go.Figure(go.Indicator(
-        mode="gauge+number+delta",
-        value=alcance,
-        delta={"reference": 100},
-        gauge={
-            "axis": {"range": [0,100]},
-            "bar": {"color": "#1f4e9c"},
-            "steps": [
-                {"range": [0,50], "color": "#fce4ec"},
-                {"range": [50,80], "color": "#fff8e1"},
-                {"range": [80,100], "color": "#e8f5e9"},
-            ],
-        },
-        title={"text": "% Alcance vs Meta"}
-    ))
-    fig_gauge.update_layout(height=300)
-    st.plotly_chart(fig_gauge, use_container_width=True)
-
-    st.divider()
-
     # Calidad de datos
     st.markdown("## 🔬 Calidad de datos")
     campos = {"Nombre": COL_NOMBRE, "Teléfono": COL_TEL, "Edad": COL_EDAD,
               "Sexo": COL_SEXO, "País": COL_PAIS, "Entidad": COL_ENTIDAD}
-    calidad = {k: round(df_salud[v].notna().sum()/len(df_salud)*100,1)
-               for k,v in campos.items() if v in df_salud.columns}
+    calidad = {k: round(df_salud[v].notna().sum()/len(df_salud)*100, 1)
+               for k, v in campos.items() if v in df_salud.columns}
 
     col_c1, col_c2 = st.columns(2)
     with col_c1:
@@ -825,7 +916,8 @@ elif modulo == "📋 MEAL & Calidad":
         df_cal = pd.DataFrame(list(calidad.items()), columns=["Campo","% Completitud"])
         fig_cal = px.bar(df_cal.sort_values("% Completitud"), x="% Completitud", y="Campo",
                         orientation="h", color="% Completitud",
-                        color_continuous_scale=["#e53935","#ffc107","#4caf50"], range_x=[0,100])
+                        color_continuous_scale=["#e53935","#ffc107","#4caf50"],
+                        range_x=[0,100])
         fig_cal.update_layout(coloraxis_showscale=False)
         st.plotly_chart(fig_cal, use_container_width=True)
 
@@ -833,13 +925,5 @@ elif modulo == "📋 MEAL & Calidad":
 
     # Cruce Salud + Call Center
     st.markdown("## 🔗 Cruce Salud + Call Center")
-    if not df_cc.empty and "N_mero_telef_nico_de_quien_llama" in df_cc.columns and COL_TEL in df_salud.columns:
-        tels_s = set(df_salud[COL_TEL].dropna().astype(str).str.strip())
-        tels_c = set(df_cc["N_mero_telef_nico_de_quien_llama"].dropna().astype(str).str.strip())
-        en_ambos = tels_s & tels_c
-        col1, col2, col3 = st.columns(3)
-        col1.metric("📊 En salud", len(tels_s))
-        col2.metric("📞 En call center", len(tels_c))
-        col3.metric("🔗 En ambas", len(en_ambos))
-        if len(en_ambos) > 0:
-            st.info(f"**{len(en_ambos)}** personas aparecen en salud y también llamaron al call center.")
+    st.caption("Personas que aparecen en la base de salud Y también contactaron al call center — por nombre y teléfono.")
+    mostrar_cruce(df_salud, df_cc, rol)
