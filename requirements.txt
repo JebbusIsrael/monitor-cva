@@ -7,3 +7,4 @@ openpyxl
 pyyaml
 bcrypt
 requests
+fpdf2
