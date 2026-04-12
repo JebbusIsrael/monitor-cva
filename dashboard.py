@@ -3,10 +3,10 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import io
+import bcrypt
 import os
 from datetime import datetime, date, timedelta
 from cryptography.fernet import Fernet
-import streamlit_authenticator as stauth
 from fpdf import FPDF
 
 # ─────────────────────────────────────────────
@@ -133,95 +133,66 @@ st.markdown("""
 config = {
     "credentials": {
         "usernames": {
-            "tijuana": {
-                "name": "Equipo Tijuana",
-                "password": "$2b$12$BhOVLaSzAurxpX3E2tBj/.nysVwxEmgds8GrN9vZDL9nLAQy0hC9u",
-                "role": "operator",
-            },
-            "oaxaca": {
-                "name": "Equipo Oaxaca",
-                "password": "$2b$12$QNoD66.3qsTDGHq6FqiR8.u2sbTNIyQzcGrEtsSqkZtH176nNw8Ke",
-                "role": "operator",
-            },
-            "cdmx": {
-                "name": "Equipo CDMX",
-                "password": "$2b$12$xp1Cn5nCKLGiZQikf0WqBeqs6crp3tPRtF9ab7S92kNPBc8Xe4TSe",
-                "role": "operator",
-            },
-            "tapachula": {
-                "name": "Equipo Tapachula",
-                "password": "$2b$12$Reco9TLppZJCBXfWbuokWOTKNSnF6WpJodfLYpiFkuMtIxVljQn3q",
-                "role": "operator",
-            },
-            "tamaulipas": {
-                "name": "Equipo Tamaulipas",
-                "password": "$2b$12$VF2x0pO2QnjXj/jDatDDVOjK3cCkBRsCLFhKFVRaP5CmmUu1SVrBC",
-                "role": "operator",
-            },
-            "tabasco": {
-                "name": "Equipo Tabasco",
-                "password": "$2b$12$8VpQpbLRQitjhh1iX0Sa/.7Bvyv8KaTxpwPC0LB6QKEgSndVvTzVa",
-                "role": "operator",
-            },
-            "Monitoreo_admin": {
-                "name": "Monitoreo",
-                "password": "$2b$12$Lquzvyq6SYH0zJp4nnVRj.KZkJ7VIp2Y0RYRphVjev3nMPmRpfERe",
-                "role": "admin",
-            },
+            "Monitoreo_admin": {"name": "Monitoreo", "password": "$2b$12$Lquzvyq6SYH0zJp4nnVRj.KZkJ7VIp2Y0RYRphVjev3nMPmRpfERe", "role": "admin"},
+            "tijuana": {"name": "Equipo Tijuana", "password": "$2b$12$BhOVLaSzAurxpX3E2tBj/.nysVwxEmgds8GrN9vZDL9nLAQy0hC9u", "role": "operator"},
+            "oaxaca": {"name": "Equipo Oaxaca", "password": "$2b$12$QNoD66.3qsTDGHq6FqiR8.u2sbTNIyQzcGrEtsSqkZtH176nNw8Ke", "role": "operator"},
+            "cdmx": {"name": "Equipo CDMX", "password": "$2b$12$xp1Cn5nCKLGiZQikf0WqBeqs6crp3tPRtF9ab7S92kNPBc8Xe4TSe", "role": "operator"},
+            "tapachula": {"name": "Equipo Tapachula", "password": "$2b$12$Reco9TLppZJCBXfWbuokWOTKNSnF6WpJodfLYpiFkuMtIxVljQn3q", "role": "operator"},
+            "tamaulipas": {"name": "Equipo Tamaulipas", "password": "$2b$12$VF2x0pO2QnjXj/jDatDDVOjK3cCkBRsCLFhKFVRaP5CmmUu1SVrBC", "role": "operator"},
+            "tabasco": {"name": "Equipo Tabasco", "password": "$2b$12$8VpQpbLRQitjhh1iX0Sa/.7Bvyv8KaTxpwPC0LB6QKEgSndVvTzVa", "role": "operator"},
         }
     },
-    "cookie": {
-        "expiry_days": 1,
-        "key": "monitor_cva_stc",
-        "name": "monitor_cva_cookie",
-    },
+    "cookie": {"expiry_days": 1, "key": "monitor_cva_stc", "name": "monitor_cva_cookie"},
 }
 
 # ─────────────────────────────────────────────
-# LOGIN
+# LOGIN PROPIO (sin cookies externas)
 # ─────────────────────────────────────────────
-authenticator = stauth.Authenticate(
-    config["credentials"],
-    config["cookie"]["name"],
-    config["cookie"]["key"],
-    config["cookie"]["expiry_days"],
-)
-authenticator.login(location="main")
-name = st.session_state.get("name")
-authentication_status = st.session_state.get("authentication_status")
-username = st.session_state.get("username")
+def verificar_login(username, password):
+    usuarios = config["credentials"]["usernames"]
+    if username not in usuarios:
+        return False
+    hashed = usuarios[username]["password"]
+    return bcrypt.checkpw(password.encode(), hashed.encode())
 
-if authentication_status is False:
-    st.error("Usuario o contraseña incorrectos.")
+if "autenticado" not in st.session_state:
+    st.session_state.autenticado = False
+    st.session_state.username = ""
+    st.session_state.name = ""
+    st.session_state.rol = ""
+
+if not st.session_state.autenticado:
+    st.markdown("""
+    <div style="max-width:400px;margin:80px auto;padding:30px;border-radius:12px;
+    box-shadow:0 4px 20px rgba(0,0,0,0.1);background:white;">
+    <div style="background:linear-gradient(90deg,#c8102e,#1f4e9c);padding:16px;
+    border-radius:8px;text-align:center;color:white;margin-bottom:24px;">
+    <h2 style="margin:0">🏥 Monitor PTM</h2>
+    <p style="margin:4px 0 0">Save the Children México</p>
+    </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    with st.form("login_form"):
+        st.markdown("### Iniciar sesión")
+        usuario_input = st.text_input("Usuario")
+        password_input = st.text_input("Contraseña", type="password")
+        submitted = st.form_submit_button("Entrar", use_container_width=True)
+
+        if submitted:
+            if verificar_login(usuario_input, password_input):
+                st.session_state.autenticado = True
+                st.session_state.username = usuario_input
+                st.session_state.name = config["credentials"]["usernames"][usuario_input]["name"]
+                st.session_state.rol = config["credentials"]["usernames"][usuario_input]["role"]
+                st.rerun()
+            else:
+                st.error("Usuario o contraseña incorrectos.")
     st.stop()
-if authentication_status is None:
-    st.warning("Ingresa tus credenciales para continuar.")
-    st.stop()
 
-rol = config["credentials"]["usernames"][username]["role"]
-
-# ─────────────────────────────────────────────
-# LOGIN
-# ─────────────────────────────────────────────
-authenticator = stauth.Authenticate(
-    config["credentials"],
-    config["cookie"]["name"],
-    config["cookie"]["key"],
-    config["cookie"]["expiry_days"],
-)
-authenticator.login(location="main")
-name = st.session_state.get("name")
-authentication_status = st.session_state.get("authentication_status")
-username = st.session_state.get("username")
-
-if authentication_status is False:
-    st.error("Usuario o contraseña incorrectos.")
-    st.stop()
-if authentication_status is None:
-    st.warning("Ingresa tus credenciales para continuar.")
-    st.stop()
-
-rol = config["credentials"]["usernames"][username]["role"]
+name = st.session_state.name
+username = st.session_state.username
+rol = st.session_state.rol
 
 # ─────────────────────────────────────────────
 # COLUMNAS
@@ -571,7 +542,12 @@ with st.sidebar:
     if st.button("🔄 Actualizar datos"):
         st.cache_data.clear()
         st.rerun()
-    authenticator.logout("Cerrar sesión", "sidebar")
+    if st.button("🚪 Cerrar sesión"):
+        st.session_state.autenticado = False
+        st.session_state.username = ""
+        st.session_state.name = ""
+        st.session_state.rol = ""
+        st.rerun()
     st.divider()
     st.caption("Monitor PTM v7.1\nSave the Children México")
 
