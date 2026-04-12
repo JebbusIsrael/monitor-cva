@@ -8,6 +8,7 @@ from datetime import datetime, date, timedelta
 from cryptography.fernet import Fernet
 import streamlit_authenticator as stauth
 from io import BytesIO
+import locale
 
 # ─────────────────────────────────────────────
 # CONFIGURACIÓN
@@ -19,6 +20,23 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+# Fecha en español sin locale (compatible con Streamlit Cloud)
+MESES_ES = {
+    1: "enero", 2: "febrero", 3: "marzo", 4: "abril",
+    5: "mayo", 6: "junio", 7: "julio", 8: "agosto",
+    9: "septiembre", 10: "octubre", 11: "noviembre", 12: "diciembre"
+}
+DIAS_ES = {
+    0: "lunes", 1: "martes", 2: "miércoles", 3: "jueves",
+    4: "viernes", 5: "sábado", 6: "domingo"
+}
+
+def fecha_es(d: date) -> str:
+    return f"{DIAS_ES[d.weekday()]} {d.day:02d}/{d.month:02d}"
+
+def fecha_larga_es(d: date) -> str:
+    return f"{d.day} de {MESES_ES[d.month]} de {d.year}"
+
 st.markdown("""
 <style>
     [data-testid="stDataFrameResizable"] button[title="Download"] { display: none !important; }
@@ -29,53 +47,19 @@ st.markdown("""
         color: white;
         margin-bottom: 20px;
     }
-    .semaforo-verde {
-        background: #e8f5e9;
-        border-left: 5px solid #4caf50;
-        padding: 10px 14px;
-        border-radius: 8px;
-        margin-bottom: 6px;
-    }
-    .semaforo-amarillo {
-        background: #fff8e1;
-        border-left: 5px solid #ffc107;
-        padding: 10px 14px;
-        border-radius: 8px;
-        margin-bottom: 6px;
-    }
-    .semaforo-rojo {
-        background: #fce4ec;
-        border-left: 5px solid #e53935;
-        padding: 10px 14px;
-        border-radius: 8px;
-        margin-bottom: 6px;
-    }
-    .alerta-nueva {
-        background: #e8f5e9;
-        border-left: 4px solid #4caf50;
-        padding: 10px;
-        border-radius: 8px;
-        margin-bottom: 6px;
-    }
-    .alerta-duplicado {
-        background: #fff3e0;
-        border-left: 4px solid #ff9800;
-        padding: 10px;
-        border-radius: 8px;
-        margin-bottom: 6px;
-    }
-    .alerta-critica {
-        background: #fce4ec;
-        border-left: 4px solid #e53935;
-        padding: 10px;
-        border-radius: 8px;
-        margin-bottom: 6px;
-    }
+    .semaforo-verde { background:#e8f5e9; border-left:5px solid #4caf50; padding:10px 14px; border-radius:8px; margin-bottom:6px; }
+    .semaforo-amarillo { background:#fff8e1; border-left:5px solid #ffc107; padding:10px 14px; border-radius:8px; margin-bottom:6px; }
+    .semaforo-rojo { background:#fce4ec; border-left:5px solid #e53935; padding:10px 14px; border-radius:8px; margin-bottom:6px; }
+    .alerta-nueva { background:#e8f5e9; border-left:4px solid #4caf50; padding:10px; border-radius:8px; margin-bottom:6px; }
+    .alerta-duplicado { background:#fff3e0; border-left:4px solid #ff9800; padding:10px; border-radius:8px; margin-bottom:6px; }
+    .alerta-critica { background:#fce4ec; border-left:4px solid #e53935; padding:10px; border-radius:8px; margin-bottom:6px; }
+    .alerta-calidad { background:#e3f2fd; border-left:4px solid #1565c0; padding:10px; border-radius:8px; margin-bottom:6px; }
+    .kpi-box { background:#f8f9fa; border-radius:10px; padding:16px; text-align:center; border:1px solid #dee2e6; }
 </style>
 """, unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────
-# USUARIOS — reemplaza los HASH con los tuyos
+# USUARIOS
 # ─────────────────────────────────────────────
 config = {
     "credentials": {
@@ -123,8 +107,6 @@ config = {
         "name": "monitor_cva_cookie",
     },
 }
-
-
 # ─────────────────────────────────────────────
 # LOGIN
 # ─────────────────────────────────────────────
@@ -134,9 +116,7 @@ authenticator = stauth.Authenticate(
     config["cookie"]["key"],
     config["cookie"]["expiry_days"],
 )
-
 authenticator.login(location="main")
-
 name = st.session_state.get("name")
 authentication_status = st.session_state.get("authentication_status")
 username = st.session_state.get("username")
@@ -144,12 +124,50 @@ username = st.session_state.get("username")
 if authentication_status is False:
     st.error("Usuario o contraseña incorrectos.")
     st.stop()
-
 if authentication_status is None:
     st.warning("Ingresa tus credenciales para continuar.")
     st.stop()
 
 rol = config["credentials"]["usernames"][username]["role"]
+
+# ─────────────────────────────────────────────
+# COLUMNAS CLAVE
+# ─────────────────────────────────────────────
+COL_NOMBRE = "Nombre del paciente"
+COL_TEL = "Número de teléfono con whatsapp (en caso de no contar con whatsapp, proporcionar de cualquier manera un número de contacto)"
+COL_TEL2 = "Por favor, proporcione un número de contacto alternativo"
+COL_EDAD = "Edad del paciente"
+COL_SEXO = "Sexo"
+COL_PAIS = "País de origen"
+COL_ENTIDAD = "Selecciona la entidad federativa en la que te encuentras"
+COL_MUNICIPIO = "Municipio:"
+COL_FECHA = "_submission_time"
+COL_MEDICO = "Nombre del médico/personal de salud que aplica la encuesta"
+COL_ORG = "Nombre de la organización a la que pertenece"
+COL_ESPECIALIDAD = "Especifique el tipo de especialidad que requiere el paciente:"
+COL_OTRO_SERVICIO = "¿Cuáles?"
+COL_CONSENTIMIENTO = "Favor de leer la siguiente nota al paciente: Buenos días. Estamos realizando un levantamiento de información con el objetivo de identificar posibles beneficiarios para recibir una tarjeta de dinero electrónico para la compra de medicamentos, estudios de laboratorio y otros productos relacionados con el cuidado de la salud. ¿Usted acepta ser entrevistado?"
+COLS_PII = [COL_NOMBRE, COL_TEL, COL_TEL2]
+
+# Composición familiar
+COLS_NINAS = ["Número de niñas de 0 a 5 años", "Número de niñas de 6 a 12 años", "Número de niñas de 13 a 17 años"]
+COLS_NINOS = ["Número de niños de 0 a 5 años", "Número de niños de 6 a 12 años", "Número de niños de 13 a 17 años"]
+COL_EMBARAZADAS = "Número de mujeres embarazadas"
+COL_LACTANTES = "Número de mujeres lactantes"
+COL_DISCAPACIDAD_N = "Número de niñas o adolescentes en condición de discapacidad"
+COL_DISCAPACIDAD_H = "Número de hombres adultos en condición de discapacidad"
+COL_DISCAPACIDAD_M = "Número de mujeres adultas en condición de discapacidad"
+COL_ADULTOS_M = "Número de mujeres de 65 años o más"
+COL_ADULTOS_H = "Número de hombres de 65 años o más"
+COL_JEFE_FAMILIA = "Sexo de la persona jefa de familia"
+
+# Organizaciones de apoyo
+COLS_ORGS_APOYO = ["¿De quién?/ACNUR", "¿De quién?/HIAS", "¿De quién?/DRC",
+                   "¿De quién?/Médicos sin fronteras", "¿De quién?/Médicos del Mundo",
+                   "¿De quién?/Sector salud de México", "¿De quién?/Otro"]
+
+# Meta del proyecto (ajusta según tu proyecto)
+META_PROYECTO = 1200
 
 # ─────────────────────────────────────────────
 # DESCIFRADO
@@ -174,58 +192,96 @@ def cargar_datos():
 # ─────────────────────────────────────────────
 # HELPERS
 # ─────────────────────────────────────────────
-def contar_seleccionados(serie):
-    return serie.apply(
-        lambda x: pd.notna(x) and str(x).strip() not in ['', '0', 'nan', 'False', '0.0']
-    ).sum()
+def contar_sel(serie):
+    return serie.apply(lambda x: pd.notna(x) and str(x).strip() not in ['', '0', 'nan', 'False', '0.0']).sum()
+
+def suma_col(df, col):
+    if col in df.columns:
+        return pd.to_numeric(df[col], errors="coerce").fillna(0).sum()
+    return 0
 
 def detectar_duplicados(df):
-    col_nombre = "Nombre del paciente"
-    col_tel = "Número de teléfono con whatsapp (en caso de no contar con whatsapp, proporcionar de cualquier manera un número de contacto)"
-    col_entidad = "Selecciona la entidad federativa en la que te encuentras"
-    if col_nombre not in df.columns or col_tel not in df.columns:
+    if COL_NOMBRE not in df.columns or COL_TEL not in df.columns:
         return pd.DataFrame()
-    cols = [c for c in [col_nombre, col_tel, col_entidad, "_submission_time"] if c in df.columns]
-    df_temp = df[cols].dropna(subset=[col_nombre, col_tel])
-    return df_temp[df_temp.duplicated(subset=[col_nombre, col_tel], keep=False)].sort_values(col_nombre)
+    cols = [c for c in [COL_NOMBRE, COL_TEL, COL_ENTIDAD, COL_FECHA] if c in df.columns]
+    df_t = df[cols].dropna(subset=[COL_NOMBRE, COL_TEL])
+    return df_t[df_t.duplicated(subset=[COL_NOMBRE, COL_TEL], keep=False)].sort_values(COL_NOMBRE)
 
-def semaforo_estado(registros, umbral_rojo=50, umbral_amarillo=150):
-    if registros < umbral_rojo:
-        return "rojo", "🔴"
-    elif registros < umbral_amarillo:
-        return "amarillo", "🟡"
-    else:
-        return "verde", "🟢"
+def semaforo(n, rojo=50, amarillo=150):
+    if n < rojo: return "rojo", "🔴"
+    elif n < amarillo: return "amarillo", "🟡"
+    else: return "verde", "🟢"
 
-def generar_reporte_dia(df, df_cc, entidad_filtro=None):
+def calidad_datos(df):
+    """Calcula % de completitud de campos críticos."""
+    campos = {
+        "Nombre": COL_NOMBRE,
+        "Teléfono": COL_TEL,
+        "Edad": COL_EDAD,
+        "Sexo": COL_SEXO,
+        "País": COL_PAIS,
+        "Entidad": COL_ENTIDAD,
+    }
+    resultado = {}
+    for nombre, col in campos.items():
+        if col in df.columns:
+            pct = round(df[col].notna().sum() / len(df) * 100, 1)
+            resultado[nombre] = pct
+    return resultado
+
+def generar_reporte(df, df_cc, entidad_sel, periodo_dias=5):
     hoy = date.today()
     output = BytesIO()
-    cols_pii = [
-        "Nombre del paciente",
-        "Número de teléfono con whatsapp (en caso de no contar con whatsapp, proporcionar de cualquier manera un número de contacto)",
-        "Por favor, proporcione un número de contacto alternativo",
-    ]
-    col_entidad = "Selecciona la entidad federativa en la que te encuentras"
-
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
-        if not df.empty and "_submission_time" in df.columns:
-            df_rep = df.copy()
-            if entidad_filtro and entidad_filtro != "Todas" and col_entidad in df_rep.columns:
-                df_rep = df_rep[df_rep[col_entidad] == entidad_filtro]
+        # Filtrar
+        df_rep = df.copy()
+        if entidad_sel != "Todas" and COL_ENTIDAD in df_rep.columns:
+            df_rep = df_rep[df_rep[COL_ENTIDAD] == entidad_sel]
 
-            nuevos = df_rep[df_rep["_submission_time"].dt.date == hoy]
-            resumen = pd.DataFrame({
-                "Indicador": ["Total registros", "Nuevos hoy", "Entidad filtrada"],
-                "Valor": [len(df_rep), len(nuevos), entidad_filtro or "Todas"]
-            })
-            resumen.to_excel(writer, sheet_name="Resumen", index=False)
-            cols_ok = [c for c in nuevos.columns if c not in cols_pii]
-            nuevos[cols_ok].to_excel(writer, sheet_name="Nuevos hoy", index=False)
+        # Hoja 1 — Resumen
+        cols_serv = [c for c in df_rep.columns if "Servicios que requiere" in c and "/" in c]
+        resumen = pd.DataFrame({
+            "Indicador": [
+                "Total registros", f"Entidad filtrada",
+                "Nuevos hoy", "Casos críticos (3+ servicios)",
+                "Duplicados detectados", "Meta del proyecto", "% Alcance"
+            ],
+            "Valor": [
+                len(df_rep), entidad_sel,
+                len(df_rep[df_rep[COL_FECHA].dt.date == hoy]) if COL_FECHA in df_rep.columns else "N/A",
+                len(df_rep[df_rep[cols_serv].apply(lambda r: sum(
+                    pd.notna(v) and str(v).strip() not in ['','0','nan','False','0.0'] for v in r
+                ), axis=1) >= 3]) if cols_serv else "N/A",
+                len(detectar_duplicados(df_rep)),
+                META_PROYECTO,
+                f"{round(len(df_rep)/META_PROYECTO*100, 1)}%"
+            ]
+        })
+        resumen.to_excel(writer, sheet_name="Resumen MEAL", index=False)
 
-        if not df_cc.empty and "_submission_time" in df_cc.columns:
-            cc_hoy = df_cc[df_cc["_submission_time"].dt.date == hoy]
-            cols_pii_cc = ["Nombre_de_la_persona_que_llama", "N_mero_telef_nico_de_quien_llama"]
-            cols_cc = [c for c in cc_hoy.columns if c not in cols_pii_cc]
+        # Hoja 2 — Últimos 5 días sin PII
+        if COL_FECHA in df_rep.columns:
+            fecha_corte = hoy - timedelta(days=periodo_dias)
+            recientes = df_rep[df_rep[COL_FECHA].dt.date >= fecha_corte]
+            cols_ok = [c for c in recientes.columns if c not in COLS_PII]
+            recientes[cols_ok].to_excel(writer, sheet_name=f"Últimos {periodo_dias} días", index=False)
+
+        # Hoja 3 — Análisis demográfico
+        if COL_SEXO in df_rep.columns:
+            demo = df_rep[COL_SEXO].value_counts().reset_index()
+            demo.columns = ["Sexo", "Total"]
+            demo.to_excel(writer, sheet_name="Demografía", index=False)
+
+        # Hoja 4 — Servicios
+        if cols_serv:
+            serv_data = {c.split("/")[-1].strip(): contar_sel(df_rep[c]) for c in cols_serv}
+            df_serv = pd.DataFrame(list(serv_data.items()), columns=["Servicio", "Personas"])
+            df_serv.to_excel(writer, sheet_name="Servicios requeridos", index=False)
+
+        # Hoja 5 — Call Center hoy
+        if not df_cc.empty and COL_FECHA in df_cc.columns:
+            cc_hoy = df_cc[df_cc[COL_FECHA].dt.date == hoy]
+            cols_cc = [c for c in cc_hoy.columns if c not in ["Nombre_de_la_persona_que_llama", "N_mero_telef_nico_de_quien_llama"]]
             cc_hoy[cols_cc].to_excel(writer, sheet_name="Call Center hoy", index=False)
 
     return output.getvalue()
@@ -237,292 +293,325 @@ with st.sidebar:
     st.markdown(f"### 👤 {name}")
     st.caption(f"Rol: `{rol}`")
     st.divider()
-
-    modulo = st.radio("Módulo", ["📊 Salud / Beneficiarios", "📞 Call Center"],
+    modulo = st.radio("Módulo", ["📊 Salud / Beneficiarios", "📞 Call Center", "📋 MEAL & Calidad"],
                       label_visibility="collapsed")
     st.divider()
-
     if st.button("🔄 Actualizar datos"):
         st.cache_data.clear()
         st.rerun()
-
     authenticator.logout("Cerrar sesión", "sidebar")
     st.divider()
-    st.caption("Monitor PTM v4.0\nSave the Children México")
+    st.caption("Monitor PTM v5.0\nSave the Children México")
 
 # ─────────────────────────────────────────────
-# CARGAR DATOS
+# CARGAR
 # ─────────────────────────────────────────────
 with st.spinner("Cargando datos cifrados..."):
     df_salud, df_cc = cargar_datos()
 
-# ═══════════════════════════════════════════════
+# Parsear fechas
+for df_tmp in [df_salud, df_cc]:
+    if not df_tmp.empty and COL_FECHA in df_tmp.columns:
+        df_tmp[COL_FECHA] = pd.to_datetime(df_tmp[COL_FECHA], errors="coerce")
+
+hoy = date.today()
+
+# ═══════════════════════════════════════════════════════
 # MÓDULO 1: SALUD
-# ═══════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════
 if modulo == "📊 Salud / Beneficiarios":
 
-    # ── HEADER ──
-    hoy = date.today()
     st.markdown(f"""
     <div class="header-bar">
         🏥 <strong>Monitor PTM — Save the Children México</strong>
-        &nbsp;&nbsp;|&nbsp;&nbsp;
-        📅 {hoy.strftime("%d de %B de %Y")}
-        &nbsp;&nbsp;|&nbsp;&nbsp;
-        👤 {name} ({rol})
-    </div>
-    """, unsafe_allow_html=True)
+        &nbsp;|&nbsp; 📅 {fecha_larga_es(hoy)}
+        &nbsp;|&nbsp; 👤 {name} ({rol})
+    </div>""", unsafe_allow_html=True)
 
     if df_salud.empty:
         st.warning("Sin datos disponibles aún.")
         st.stop()
 
-    # Parsear fechas
-    if "_submission_time" in df_salud.columns:
-        df_salud["_submission_time"] = pd.to_datetime(df_salud["_submission_time"], errors="coerce")
-
-    col_entidad = "Selecciona la entidad federativa en la que te encuentras"
-
-    # ── FILTRO POR ENTIDAD ──
+    # ── FILTRO ENTIDAD ──
     entidades = ["Todas"]
-    if col_entidad in df_salud.columns:
-        entidades += sorted(df_salud[col_entidad].dropna().unique().tolist())
-
+    if COL_ENTIDAD in df_salud.columns:
+        entidades += sorted(df_salud[COL_ENTIDAD].dropna().unique().tolist())
     entidad_sel = st.selectbox("🗺️ Filtrar por entidad federativa", entidades)
 
     df = df_salud.copy()
-    if entidad_sel != "Todas" and col_entidad in df.columns:
-        df = df[df[col_entidad] == entidad_sel]
+    if entidad_sel != "Todas" and COL_ENTIDAD in df.columns:
+        df = df[df[COL_ENTIDAD] == entidad_sel]
 
-    st.caption(f"Mostrando **{len(df)}** registros de **{entidad_sel}**")
+    st.caption(f"Mostrando **{len(df)}** registros — **{entidad_sel}**")
     st.divider()
 
-    # ── ALERTAS ──
-    nuevos_hoy = df[df["_submission_time"].dt.date == hoy] if "_submission_time" in df.columns else pd.DataFrame()
-    duplicados = detectar_duplicados(df)
-
-    # Casos críticos — 3+ servicios
+    # ── SERVICIOS ──
     servicios_cols = [c for c in df.columns if "Servicios que requiere el paciente:/" in c]
+
+    def es_sel(x):
+        return pd.notna(x) and str(x).strip() not in ['', '0', 'nan', 'False', '0.0']
+
     if servicios_cols:
-        def es_seleccionado(x):
-            return pd.notna(x) and str(x).strip() not in ['', '0', 'nan', 'False', '0.0']
-        df["num_servicios"] = df[servicios_cols].apply(
-            lambda row: sum(es_seleccionado(v) for v in row), axis=1
-        )
-        casos_criticos = df[df["num_servicios"] >= 3]
+        df["num_servicios"] = df[servicios_cols].apply(lambda r: sum(es_sel(v) for v in r), axis=1)
     else:
         df["num_servicios"] = 0
-        casos_criticos = pd.DataFrame()
 
+    # ── DATOS OPERATIVOS RECIENTES ──
+    st.markdown("## 📅 Operativo reciente")
+
+    nuevos_hoy = df[df[COL_FECHA].dt.date == hoy] if COL_FECHA in df.columns else pd.DataFrame()
+    duplicados = detectar_duplicados(df)
+    casos_criticos = df[df["num_servicios"] >= 3]
+
+    # Alertas
     if len(nuevos_hoy) > 0:
         st.markdown(f"""<div class="alerta-nueva">
-            🟢 <strong>{len(nuevos_hoy)} nuevos registros hoy</strong> — {hoy.strftime("%d/%m/%Y")}
+            🟢 <strong>{len(nuevos_hoy)} nuevos registros hoy</strong> — {fecha_es(hoy)}
         </div>""", unsafe_allow_html=True)
-
     if len(casos_criticos) > 0:
         st.markdown(f"""<div class="alerta-critica">
-            🔴 <strong>{len(casos_criticos)} casos críticos</strong> — personas con 3 o más servicios requeridos. Prioridad de atención.
+            🔴 <strong>{len(casos_criticos)} personas con 3+ servicios requeridos</strong> — requieren atención prioritaria
         </div>""", unsafe_allow_html=True)
-
     if len(duplicados) > 0:
         st.markdown(f"""<div class="alerta-duplicado">
-            ⚠️ <strong>{len(duplicados)} posibles duplicados</strong> detectados por nombre y teléfono.
+            ⚠️ <strong>{len(duplicados)} posibles duplicados</strong> por nombre y teléfono
         </div>""", unsafe_allow_html=True)
 
-    # ── MÉTRICAS ──
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("👥 Total registros", len(df))
+    # Métricas
+    col1, col2, col3, col4, col5 = st.columns(5)
+    col1.metric("👥 Total", len(df))
     col2.metric("🆕 Nuevos hoy", len(nuevos_hoy))
-    col3.metric("🔴 Casos críticos", len(casos_criticos))
+    col3.metric("🔴 Prioridad alta", len(casos_criticos))
     col4.metric("⚠️ Duplicados", len(duplicados))
+    col5.metric("🎯 Alcance meta", f"{round(len(df_salud)/META_PROYECTO*100,1)}%")
 
     st.divider()
 
-    # ── ÚLTIMOS 5 DÍAS ──
-    st.markdown("#### 📅 Registros — últimos 5 días")
-    if "_submission_time" in df.columns:
+    # Últimos 5 días
+    st.markdown("#### 📆 Registros últimos 5 días")
+    if COL_FECHA in df.columns:
         ultimos_5 = [(hoy - timedelta(days=i)) for i in range(4, -1, -1)]
-        conteos_dias = []
-        for dia in ultimos_5:
-            registros_dia = df[df["_submission_time"].dt.date == dia]
-            conteos_dias.append({
-                "Día": dia.strftime("%a %d/%m"),
-                "Fecha": dia,
-                "Registros": len(registros_dia),
-                "Es hoy": dia == hoy
-            })
-
-        df_dias = pd.DataFrame(conteos_dias)
-        colores = ["#1f4e9c" if not r else "#4caf50" for r in df_dias["Es hoy"]]
+        conteos = [{"Día": fecha_es(d), "Fecha": d, "Registros": len(df[df[COL_FECHA].dt.date == d]), "Hoy": d == hoy}
+                   for d in ultimos_5]
+        df_dias = pd.DataFrame(conteos)
+        colores = ["#4caf50" if r else "#1f4e9c" for r in df_dias["Hoy"]]
 
         fig_dias = go.Figure(go.Bar(
-            x=df_dias["Día"],
-            y=df_dias["Registros"],
-            marker_color=colores,
-            text=df_dias["Registros"],
-            textposition="outside"
+            x=df_dias["Día"], y=df_dias["Registros"],
+            marker_color=colores, text=df_dias["Registros"], textposition="outside"
         ))
-        fig_dias.update_layout(
-            showlegend=False,
-            yaxis_title="Registros",
-            plot_bgcolor="white",
-            height=300
-        )
+        fig_dias.update_layout(showlegend=False, plot_bgcolor="white", height=280,
+                               yaxis_title="Registros")
         st.plotly_chart(fig_dias, use_container_width=True)
 
-        # Tabla expandible por día
-        st.markdown("##### Ver registros por día")
-        cols_pii = [
-            "Nombre del paciente",
-            "Número de teléfono con whatsapp (en caso de no contar con whatsapp, proporcionar de cualquier manera un número de contacto)"
-        ]
-        cols_tabla = ["Nombre del paciente", "Edad del paciente", "Sexo",
-                     "País de origen", col_entidad, "_submission_time"]
+        # Tablas expandibles por día
+        st.markdown("##### Detalle por día")
+        cols_tabla = [COL_NOMBRE, COL_EDAD, COL_SEXO, COL_PAIS, COL_ENTIDAD,
+                     COL_MUNICIPIO, "num_servicios", COL_ESPECIALIDAD, COL_FECHA]
 
-        for item in reversed(conteos_dias):
-            dia = item["Fecha"]
-            registros_dia = df[df["_submission_time"].dt.date == dia]
-            label = f"{'🟢 Hoy' if dia == hoy else dia.strftime('%A %d/%m')} — {len(registros_dia)} registros"
-
-            with st.expander(label, expanded=(dia == hoy)):
-                if len(registros_dia) == 0:
+        for item in reversed(conteos):
+            d = item["Fecha"]
+            reg_dia = df[df[COL_FECHA].dt.date == d]
+            label = f"{'🟢 Hoy' if d == hoy else fecha_es(d)} — {len(reg_dia)} registros"
+            with st.expander(label, expanded=(d == hoy)):
+                if len(reg_dia) == 0:
                     st.info("Sin registros este día.")
                 else:
                     if rol in ["operator", "admin"]:
-                        cols_ver = [c for c in cols_tabla if c in registros_dia.columns]
+                        cols_ver = [c for c in cols_tabla if c in reg_dia.columns]
                     else:
-                        cols_ver = [c for c in cols_tabla if c in registros_dia.columns and c not in cols_pii]
-                    st.dataframe(registros_dia[cols_ver].reset_index(drop=True),
-                                use_container_width=True)
+                        cols_ver = [c for c in cols_tabla if c in reg_dia.columns and c not in COLS_PII]
+                    st.dataframe(reg_dia[cols_ver].reset_index(drop=True), use_container_width=True)
 
     st.divider()
 
-    # ── SEMÁFORO DE COBERTURA ──
-    st.markdown("#### 🚦 Semáforo de cobertura por entidad")
-    if col_entidad in df_salud.columns:
-        cobertura_estados = df_salud[col_entidad].value_counts().reset_index()
-        cobertura_estados.columns = ["Entidad", "Registros"]
+    # ── ANÁLISIS DEMOGRÁFICO ──
+    st.markdown("## 👥 Análisis demográfico")
 
-        col_sem_a, col_sem_b = st.columns([1, 2])
+    col_a, col_b, col_c = st.columns(3)
 
-        with col_sem_a:
-            for _, row in cobertura_estados.iterrows():
-                nivel, emoji = semaforo_estado(row["Registros"])
-                css_class = f"semaforo-{nivel}"
-                st.markdown(f"""
-                <div class="{css_class}">
-                    {emoji} <strong>{row['Entidad']}</strong> — {row['Registros']} registros
-                </div>""", unsafe_allow_html=True)
-
-            st.caption("🔴 < 50 &nbsp; 🟡 50–150 &nbsp; 🟢 > 150")
-
-        with col_sem_b:
-            cobertura_estados_sorted = cobertura_estados.sort_values("Registros")
-            fig_cob = px.bar(
-                cobertura_estados_sorted,
-                x="Registros", y="Entidad",
-                orientation="h",
-                color="Registros",
-                color_continuous_scale=["#e53935", "#ffc107", "#4caf50"],
-                text="Registros"
-            )
-            fig_cob.update_traces(textposition="outside")
-            fig_cob.update_layout(coloraxis_showscale=False, plot_bgcolor="white")
-            st.plotly_chart(fig_cob, use_container_width=True)
-
-    st.divider()
-
-    # ── CASOS CRÍTICOS ──
-    st.markdown("#### 🔴 Casos críticos — 3 o más servicios requeridos")
-    if len(casos_criticos) > 0:
-        st.caption(f"Estas {len(casos_criticos)} personas tienen mayor vulnerabilidad y deben priorizarse.")
-
-        servicios_nombres = [c.split("/")[-1].strip() for c in servicios_cols]
-
-        cols_criticos_base = ["Edad del paciente", "Sexo", col_entidad, "num_servicios", "_submission_time"]
-        cols_pii_crit = ["Nombre del paciente",
-                        "Número de teléfono con whatsapp (en caso de no contar con whatsapp, proporcionar de cualquier manera un número de contacto)"]
-
-        if rol in ["operator", "admin"]:
-            cols_criticos = cols_pii_crit + cols_criticos_base
-        else:
-            cols_criticos = cols_criticos_base
-
-        cols_disp = [c for c in cols_criticos if c in casos_criticos.columns]
-        casos_criticos_sorted = casos_criticos.sort_values("num_servicios", ascending=False)
-        st.dataframe(casos_criticos_sorted[cols_disp].rename(
-            columns={"num_servicios": "# Servicios requeridos"}
-        ).reset_index(drop=True), use_container_width=True, height=350)
-    else:
-        st.success("✅ No hay casos con 3 o más servicios simultáneos.")
-
-    st.divider()
-
-    # ── SEXO Y EDAD ──
-    col_a, col_b = st.columns(2)
     with col_a:
-        st.markdown("#### 👥 Sexo")
-        if "Sexo" in df.columns:
-            fig = px.pie(df["Sexo"].value_counts().reset_index(),
-                        values="count", names="Sexo",
+        st.markdown("#### Sexo")
+        if COL_SEXO in df.columns:
+            fig = px.pie(df[COL_SEXO].value_counts().reset_index(),
+                        values="count", names=COL_SEXO,
                         color_discrete_sequence=["#1f4e9c", "#e91e8c", "#4caf50"])
             st.plotly_chart(fig, use_container_width=True)
 
     with col_b:
-        st.markdown("#### 🎂 Grupo de edad")
-        if "Edad del paciente" in df.columns:
-            df["Edad del paciente"] = pd.to_numeric(df["Edad del paciente"], errors="coerce")
+        st.markdown("#### Grupo de edad")
+        if COL_EDAD in df.columns:
+            df[COL_EDAD] = pd.to_numeric(df[COL_EDAD], errors="coerce")
             bins = [0, 5, 12, 17, 29, 59, 120]
             labels = ["0-5", "6-12", "13-17", "18-29", "30-59", "60+"]
-            df["grupo_edad"] = pd.cut(df["Edad del paciente"], bins=bins, labels=labels)
-            edad_count = df["grupo_edad"].value_counts().sort_index().reset_index()
-            fig2 = px.bar(edad_count, x="grupo_edad", y="count",
-                         color_discrete_sequence=["#1f4e9c"])
+            df["grupo_edad"] = pd.cut(df[COL_EDAD], bins=bins, labels=labels)
+            edad_c = df["grupo_edad"].value_counts().sort_index().reset_index()
+            fig2 = px.bar(edad_c, x="grupo_edad", y="count", color_discrete_sequence=["#1f4e9c"])
             st.plotly_chart(fig2, use_container_width=True)
 
-    # ── SÍNTOMAS ──
-    st.markdown("#### 🤒 Síntomas más frecuentes")
-    sint_cols = [c for c in df.columns if "Síntomas del paciente/" in c]
-    if sint_cols:
-        sint_data = {col.split("/")[-1].strip(): contar_seleccionados(df[col]) for col in sint_cols}
-        df_sint = pd.DataFrame(list(sint_data.items()), columns=["Síntoma", "Total"])
-        df_sint = df_sint[df_sint["Total"] > 0].sort_values("Total", ascending=False)
-        fig_sint = px.bar(df_sint, x="Síntoma", y="Total", color_discrete_sequence=["#ff5722"])
-        st.plotly_chart(fig_sint, use_container_width=True)
+    with col_c:
+        st.markdown("#### Nacionalidad")
+        if COL_PAIS in df.columns:
+            pais_c = df[COL_PAIS].value_counts().head(8).reset_index()
+            pais_c.columns = ["País", "Total"]
+            fig3 = px.bar(pais_c, x="Total", y="País", orientation="h",
+                         color_discrete_sequence=["#607d8b"])
+            st.plotly_chart(fig3, use_container_width=True)
 
-    # ── SERVICIOS / TARJETA ──
-    st.markdown("#### 💳 Servicios requeridos — Tipo de tarjeta")
-    if servicios_cols:
-        serv_data = {col.split("/")[-1].strip(): contar_seleccionados(df[col]) for col in servicios_cols}
-        df_serv = pd.DataFrame(list(serv_data.items()), columns=["Servicio", "Personas"])
-        df_serv = df_serv[df_serv["Personas"] > 0].sort_values("Personas")
-        fig_serv = px.bar(df_serv, x="Personas", y="Servicio", orientation="h",
-                         color_discrete_sequence=["#1f4e9c"])
-        st.plotly_chart(fig_serv, use_container_width=True)
-        st.caption("⚠️ Una persona puede requerir más de un tipo de tarjeta.")
+    # Composición familiar
+    st.markdown("#### 👨‍👩‍👧‍👦 Composición familiar y grupos vulnerables")
+    col_f1, col_f2, col_f3, col_f4 = st.columns(4)
+
+    total_ninas = sum(suma_col(df, c) for c in COLS_NINAS)
+    total_ninos = sum(suma_col(df, c) for c in COLS_NINOS)
+    total_embarazadas = suma_col(df, COL_EMBARAZADAS)
+    total_lactantes = suma_col(df, COL_LACTANTES)
+    total_disc = suma_col(df, COL_DISCAPACIDAD_N) + suma_col(df, COL_DISCAPACIDAD_H) + suma_col(df, COL_DISCAPACIDAD_M)
+    total_adultos_m = suma_col(df, COL_ADULTOS_M)
+    total_adultos_h = suma_col(df, COL_ADULTOS_H)
+
+    col_f1.metric("👧 Niñas", int(total_ninas))
+    col_f2.metric("👦 Niños", int(total_ninos))
+    col_f3.metric("🤰 Embarazadas", int(total_embarazadas))
+    col_f4.metric("🍼 Lactantes", int(total_lactantes))
+
+    col_f5, col_f6, col_f7, col_f8 = st.columns(4)
+    col_f5.metric("♿ Discapacidad", int(total_disc))
+    col_f6.metric("👵 Mujeres 65+", int(total_adultos_m))
+    col_f7.metric("👴 Hombres 65+", int(total_adultos_h))
+    if COL_JEFE_FAMILIA in df.columns:
+        jefa_mujer = (df[COL_JEFE_FAMILIA].str.lower().str.strip() == "mujer").sum()
+        col_f8.metric("👩‍👧 Jefa de hogar mujer", int(jefa_mujer))
 
     st.divider()
 
-    # ── TENDENCIA SEMANAL ──
-    st.markdown("#### 📈 Tendencia de registros por semana")
-    if "_submission_time" in df.columns:
-        df["semana"] = df["_submission_time"].dt.to_period("W").astype(str)
-        tendencia = df.groupby("semana").size().reset_index(name="Registros")
-        fig_tend = px.line(tendencia, x="semana", y="Registros", markers=True,
-                          color_discrete_sequence=["#1f4e9c"])
-        st.plotly_chart(fig_tend, use_container_width=True)
+    # ── SÍNTOMAS Y SERVICIOS ──
+    st.markdown("## 🏥 Síntomas y servicios requeridos")
+
+    col_s1, col_s2 = st.columns(2)
+
+    with col_s1:
+        st.markdown("#### 🤒 Síntomas")
+        sint_cols = [c for c in df.columns if "Síntomas del paciente/" in c]
+        if sint_cols:
+            sint_data = {c.split("/")[-1].strip(): contar_sel(df[c]) for c in sint_cols}
+            df_sint = pd.DataFrame(list(sint_data.items()), columns=["Síntoma", "Total"])
+            df_sint = df_sint[df_sint["Total"] > 0].sort_values("Total", ascending=False)
+            fig_s = px.bar(df_sint, x="Síntoma", y="Total", color_discrete_sequence=["#ff5722"])
+            st.plotly_chart(fig_s, use_container_width=True)
+
+    with col_s2:
+        st.markdown("#### 💳 Servicios / Tipo de tarjeta")
+        if servicios_cols:
+            serv_data = {c.split("/")[-1].strip(): contar_sel(df[c]) for c in servicios_cols}
+            df_serv = pd.DataFrame(list(serv_data.items()), columns=["Servicio", "Personas"])
+            df_serv = df_serv[df_serv["Personas"] > 0].sort_values("Personas")
+            fig_sv = px.bar(df_serv, x="Personas", y="Servicio", orientation="h",
+                           color_discrete_sequence=["#1f4e9c"])
+            st.plotly_chart(fig_sv, use_container_width=True)
+            st.caption("⚠️ Selección múltiple — una persona puede requerir varios tipos.")
+
+    # Campo "Otro" servicio
+    if COL_OTRO_SERVICIO in df.columns:
+        otros = df[COL_OTRO_SERVICIO].dropna()
+        otros = otros[otros.astype(str).str.strip().str.lower() != "nan"]
+        if len(otros) > 0:
+            st.markdown("##### ❓ Detalle de servicios 'Otro'")
+            st.dataframe(otros.value_counts().reset_index().rename(
+                columns={"index": "Descripción", COL_OTRO_SERVICIO: "Frecuencia"}
+            ), use_container_width=True)
+
+    # Especialidad requerida
+    if COL_ESPECIALIDAD in df.columns:
+        esp = df[COL_ESPECIALIDAD].dropna()
+        esp = esp[esp.astype(str).str.strip().str.lower() != "nan"]
+        if len(esp) > 0:
+            st.markdown("##### 🩺 Especialidades médicas requeridas")
+            esp_count = esp.value_counts().reset_index()
+            esp_count.columns = ["Especialidad", "Personas"]
+            fig_esp = px.bar(esp_count.head(10), x="Personas", y="Especialidad",
+                            orientation="h", color_discrete_sequence=["#9c27b0"])
+            st.plotly_chart(fig_esp, use_container_width=True)
 
     st.divider()
 
-    # ── QUIÉN CAPTURÓ ──
-    st.markdown("#### 👨‍⚕️ Registros por capturista")
-    col_medico = "Nombre del médico/personal de salud que aplica la encuesta"
-    if col_medico in df.columns:
-        capturas = df[col_medico].value_counts().head(15).reset_index()
-        capturas.columns = ["Capturista", "Registros"]
-        fig_cap = px.bar(capturas, x="Registros", y="Capturista",
-                        orientation="h", color_discrete_sequence=["#607d8b"])
-        st.plotly_chart(fig_cap, use_container_width=True)
+    # ── ESTADÍSTICAS GENERALES ──
+    st.markdown("## 📊 Estadísticas generales")
+
+    # Tendencia por mes y semana
+    st.markdown("#### 📈 Tendencia de registros")
+    if COL_FECHA in df.columns:
+        vista_tend = st.radio("Ver por:", ["Semana", "Mes"], horizontal=True)
+        if vista_tend == "Semana":
+            df["periodo"] = df[COL_FECHA].dt.to_period("W").astype(str)
+        else:
+            df["periodo"] = df[COL_FECHA].dt.to_period("M").astype(str)
+        tend = df.groupby("periodo").size().reset_index(name="Registros")
+        fig_t = px.line(tend, x="periodo", y="Registros", markers=True,
+                       color_discrete_sequence=["#1f4e9c"])
+        fig_t.update_layout(xaxis_title="Período", plot_bgcolor="white")
+        st.plotly_chart(fig_t, use_container_width=True)
+
+    # Semáforo cobertura
+    st.markdown("#### 🚦 Cobertura por entidad")
+    if COL_ENTIDAD in df_salud.columns:
+        cob = df_salud[COL_ENTIDAD].value_counts().reset_index()
+        cob.columns = ["Entidad", "Registros"]
+
+        col_sem1, col_sem2 = st.columns([1, 2])
+        with col_sem1:
+            for _, row in cob.iterrows():
+                nivel, emoji = semaforo(row["Registros"])
+                st.markdown(f"""<div class="semaforo-{nivel}">
+                    {emoji} <strong>{row['Entidad']}</strong> — {row['Registros']}
+                </div>""", unsafe_allow_html=True)
+            st.caption("🔴<50 &nbsp; 🟡 50-150 &nbsp; 🟢>150")
+
+        with col_sem2:
+            fig_cob = px.bar(cob.sort_values("Registros"), x="Registros", y="Entidad",
+                            orientation="h", color="Registros",
+                            color_continuous_scale=["#e53935", "#ffc107", "#4caf50"],
+                            text="Registros")
+            fig_cob.update_traces(textposition="outside")
+            fig_cob.update_layout(coloraxis_showscale=False, plot_bgcolor="white")
+            st.plotly_chart(fig_cob, use_container_width=True)
+
+    # Organización de apoyo previo
+    st.markdown("#### 🤝 Organización de apoyo previo")
+    orgs_presentes = [c for c in COLS_ORGS_APOYO if c in df.columns]
+    if orgs_presentes:
+        org_data = {c.split("/")[-1].strip(): contar_sel(df[c]) for c in orgs_presentes}
+        df_org = pd.DataFrame(list(org_data.items()), columns=["Organización", "Personas"])
+        df_org = df_org[df_org["Personas"] > 0].sort_values("Personas")
+        fig_org = px.bar(df_org, x="Personas", y="Organización", orientation="h",
+                        color_discrete_sequence=["#00897b"])
+        st.plotly_chart(fig_org, use_container_width=True)
+
+    # Capturista + organización
+    st.markdown("#### 👨‍⚕️ Registros por capturista y organización")
+    if COL_MEDICO in df.columns:
+        cols_cap = [c for c in [COL_MEDICO, COL_ORG] if c in df.columns]
+        capturas = df.groupby(cols_cap).size().reset_index(name="Registros")
+        capturas = capturas.sort_values("Registros", ascending=False).head(15)
+        st.dataframe(capturas.reset_index(drop=True), use_container_width=True)
+
+    st.divider()
+
+    # ── TABLA COMPLETA ──
+    st.markdown("## 📋 Todos los registros")
+    cols_tabla_full = [
+        COL_NOMBRE, COL_EDAD, COL_SEXO, COL_PAIS, COL_ENTIDAD, COL_MUNICIPIO,
+        "num_servicios", COL_ESPECIALIDAD, COL_OTRO_SERVICIO, COL_FECHA
+    ]
+    if rol in ["operator", "admin"]:
+        cols_ver_full = [c for c in cols_tabla_full if c in df.columns]
+        st.info("👁 Ves nombre porque tu rol es **operator/admin**.")
+    else:
+        cols_ver_full = [c for c in cols_tabla_full if c in df.columns and c not in COLS_PII]
+
+    st.dataframe(df[cols_ver_full].rename(
+        columns={"num_servicios": "# Servicios"}
+    ).reset_index(drop=True), use_container_width=True, height=400)
 
     st.divider()
 
@@ -530,53 +619,45 @@ if modulo == "📊 Salud / Beneficiarios":
     st.markdown("#### 🔍 Duplicados detectados")
     if len(duplicados) > 0:
         st.warning(f"⚠️ **{len(duplicados)}** registros con mismo nombre y teléfono.")
-        col_nombre = "Nombre del paciente"
-        col_tel = "Número de teléfono con whatsapp (en caso de no contar con whatsapp, proporcionar de cualquier manera un número de contacto)"
-        cols_dup = [c for c in [col_nombre, col_tel, col_entidad, "_submission_time"] if c in duplicados.columns]
+        cols_dup = [c for c in [COL_NOMBRE, COL_TEL, COL_ENTIDAD, COL_FECHA] if c in duplicados.columns]
         if rol not in ["operator", "admin"]:
-            cols_dup = [c for c in cols_dup if c not in [col_nombre, col_tel]]
+            cols_dup = [c for c in cols_dup if c not in COLS_PII]
         st.dataframe(duplicados[cols_dup].reset_index(drop=True), use_container_width=True)
     else:
         st.success("✅ Sin duplicados detectados.")
 
     st.divider()
 
-    # ── REPORTE DEL DÍA ──
-    st.markdown("#### 📄 Reporte del día")
-    st.caption(f"Entidad: **{entidad_sel}** — Sin datos personales.")
-    reporte = generar_reporte_dia(df_salud, df_cc, entidad_sel)
+    # ── REPORTE ──
+    st.markdown("#### 📄 Descargar reporte")
+    st.caption(f"Entidad: **{entidad_sel}** — Incluye resumen MEAL, últimos 5 días, demografía y servicios. Sin datos personales.")
+    reporte = generar_reporte(df_salud, df_cc, entidad_sel)
     st.download_button(
-        label=f"⬇️ Descargar reporte {hoy.strftime('%d-%m-%Y')} — {entidad_sel}",
+        label=f"⬇️ Reporte {fecha_larga_es(hoy)} — {entidad_sel}",
         data=reporte,
         file_name=f"reporte_ptm_{entidad_sel}_{hoy.strftime('%d%m%Y')}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
 
-# ═══════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════
 # MÓDULO 2: CALL CENTER
-# ═══════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════
 elif modulo == "📞 Call Center":
-    hoy = date.today()
     st.markdown(f"""
     <div class="header-bar">
-        📞 <strong>Monitor Call Center — Save the Children México</strong>
-        &nbsp;&nbsp;|&nbsp;&nbsp;
-        📅 {hoy.strftime("%d de %B de %Y")}
-    </div>
-    """, unsafe_allow_html=True)
+        📞 <strong>Call Center — Save the Children México</strong>
+        &nbsp;|&nbsp; 📅 {fecha_larga_es(hoy)}
+    </div>""", unsafe_allow_html=True)
 
     if df_cc.empty:
         st.warning("Sin datos disponibles aún.")
         st.stop()
 
-    if "_submission_time" in df_cc.columns:
-        df_cc["_submission_time"] = pd.to_datetime(df_cc["_submission_time"], errors="coerce")
-
-    cc_hoy = df_cc[df_cc["_submission_time"].dt.date == hoy] if "_submission_time" in df_cc.columns else pd.DataFrame()
+    cc_hoy = df_cc[df_cc[COL_FECHA].dt.date == hoy] if COL_FECHA in df_cc.columns else pd.DataFrame()
 
     if len(cc_hoy) > 0:
         st.markdown(f"""<div class="alerta-nueva">
-            🟢 <strong>{len(cc_hoy)} nuevos casos hoy</strong> — {hoy.strftime("%d/%m/%Y")}
+            🟢 <strong>{len(cc_hoy)} nuevos casos hoy</strong> — {fecha_es(hoy)}
         </div>""", unsafe_allow_html=True)
 
     col1, col2, col3 = st.columns(3)
@@ -587,23 +668,18 @@ elif modulo == "📞 Call Center":
 
     st.divider()
 
-    # ── ÚLTIMOS 5 DÍAS CALL CENTER ──
-    st.markdown("#### 📅 Casos — últimos 5 días")
-    if "_submission_time" in df_cc.columns:
+    # Últimos 5 días
+    st.markdown("#### 📆 Casos últimos 5 días")
+    if COL_FECHA in df_cc.columns:
         ultimos_5 = [(hoy - timedelta(days=i)) for i in range(4, -1, -1)]
-        conteos_cc = []
-        for dia in ultimos_5:
-            n = len(df_cc[df_cc["_submission_time"].dt.date == dia])
-            conteos_cc.append({"Día": dia.strftime("%a %d/%m"), "Casos": n, "Es hoy": dia == hoy})
-
-        df_dias_cc = pd.DataFrame(conteos_cc)
-        colores_cc = ["#1f4e9c" if not r else "#4caf50" for r in df_dias_cc["Es hoy"]]
-        fig_cc_dias = go.Figure(go.Bar(
-            x=df_dias_cc["Día"], y=df_dias_cc["Casos"],
-            marker_color=colores_cc, text=df_dias_cc["Casos"], textposition="outside"
-        ))
-        fig_cc_dias.update_layout(showlegend=False, plot_bgcolor="white", height=280)
-        st.plotly_chart(fig_cc_dias, use_container_width=True)
+        conteos_cc = [{"Día": fecha_es(d), "Casos": len(df_cc[df_cc[COL_FECHA].dt.date == d]), "Hoy": d == hoy}
+                      for d in ultimos_5]
+        df_cc_dias = pd.DataFrame(conteos_cc)
+        colores_cc = ["#4caf50" if r else "#1f4e9c" for r in df_cc_dias["Hoy"]]
+        fig_cc = go.Figure(go.Bar(x=df_cc_dias["Día"], y=df_cc_dias["Casos"],
+                                  marker_color=colores_cc, text=df_cc_dias["Casos"], textposition="outside"))
+        fig_cc.update_layout(showlegend=False, plot_bgcolor="white", height=280)
+        st.plotly_chart(fig_cc, use_container_width=True)
 
     st.divider()
 
@@ -612,41 +688,154 @@ elif modulo == "📞 Call Center":
         st.markdown("#### 🔖 Tipos de problema")
         problemas_cols = [c for c in df_cc.columns if c.startswith("Problema/")]
         if problemas_cols:
-            prob_data = {
-                col.replace("Problema/", "").replace("_", " ").strip(): contar_seleccionados(df_cc[col])
-                for col in problemas_cols
-            }
+            prob_data = {c.replace("Problema/", "").replace("_", " ").strip(): contar_sel(df_cc[c]) for c in problemas_cols}
             df_prob = pd.DataFrame(list(prob_data.items()), columns=["Problema", "Total"])
             df_prob = df_prob[df_prob["Total"] > 0].sort_values("Total")
-            fig = px.bar(df_prob, x="Total", y="Problema", orientation="h",
-                        color_discrete_sequence=["#1f4e9c"])
-            st.plotly_chart(fig, use_container_width=True)
+            fig_p = px.bar(df_prob, x="Total", y="Problema", orientation="h", color_discrete_sequence=["#1f4e9c"])
+            st.plotly_chart(fig_p, use_container_width=True)
 
     with col_b:
-        st.markdown("#### 🏙 Casos por ciudad")
+        st.markdown("#### 🏙 Por ciudad")
         if "Ciudad" in df_cc.columns:
             ciudad = df_cc["Ciudad"].value_counts().head(10).reset_index()
-            fig2 = px.bar(ciudad, x="count", y="Ciudad", orientation="h",
-                         color_discrete_sequence=["#e91e8c"])
-            st.plotly_chart(fig2, use_container_width=True)
+            fig_c = px.bar(ciudad, x="count", y="Ciudad", orientation="h", color_discrete_sequence=["#e91e8c"])
+            st.plotly_chart(fig_c, use_container_width=True)
 
-    if "_submission_time" in df_cc.columns:
-        st.markdown("#### 📈 Tendencia semanal")
-        df_cc["semana"] = df_cc["_submission_time"].dt.to_period("W").astype(str)
-        tendencia = df_cc.groupby("semana").size().reset_index(name="Casos")
-        fig3 = px.line(tendencia, x="semana", y="Casos", markers=True,
-                      color_discrete_sequence=["#1f4e9c"])
-        st.plotly_chart(fig3, use_container_width=True)
+    # Tendencia
+    if COL_FECHA in df_cc.columns:
+        st.markdown("#### 📈 Tendencia")
+        vista_cc = st.radio("Ver por:", ["Semana", "Mes"], horizontal=True, key="cc_tend")
+        df_cc["periodo"] = df_cc[COL_FECHA].dt.to_period("W" if vista_cc == "Semana" else "M").astype(str)
+        tend_cc = df_cc.groupby("periodo").size().reset_index(name="Casos")
+        fig_tc = px.line(tend_cc, x="periodo", y="Casos", markers=True, color_discrete_sequence=["#1f4e9c"])
+        st.plotly_chart(fig_tc, use_container_width=True)
 
     st.divider()
 
     st.markdown("#### 📋 Registro de casos")
-    cols_base_cc = ["Ciudad", "Problema", "Descripci_n_del_problema", "Soluci_n_brindada", "_submission_time"]
+    cols_base_cc = ["Ciudad", "Problema", "Descripci_n_del_problema", "Soluci_n_brindada", COL_FECHA]
     cols_pii_cc = ["Nombre_de_la_persona_que_llama", "N_mero_telef_nico_de_quien_llama"]
     if rol in ["operator", "admin"]:
-        cols_mostrar_cc = cols_pii_cc + cols_base_cc
+        cols_cc_ver = cols_pii_cc + cols_base_cc
         st.info("👁 Ves nombre y teléfono porque tu rol es **operator/admin**.")
     else:
-        cols_mostrar_cc = cols_base_cc
-    cols_disp_cc = [c for c in cols_mostrar_cc if c in df_cc.columns]
+        cols_cc_ver = cols_base_cc
+    cols_disp_cc = [c for c in cols_cc_ver if c in df_cc.columns]
     st.dataframe(df_cc[cols_disp_cc].reset_index(drop=True), use_container_width=True, height=400)
+
+# ═══════════════════════════════════════════════════════
+# MÓDULO 3: MEAL & CALIDAD
+# ═══════════════════════════════════════════════════════
+elif modulo == "📋 MEAL & Calidad":
+    st.markdown(f"""
+    <div class="header-bar">
+        📋 <strong>MEAL & Calidad de datos — Save the Children México</strong>
+        &nbsp;|&nbsp; 📅 {fecha_larga_es(hoy)}
+    </div>""", unsafe_allow_html=True)
+
+    if df_salud.empty:
+        st.warning("Sin datos disponibles aún.")
+        st.stop()
+
+    st.markdown("## 🎯 KPIs del proyecto")
+
+    # Alcance vs meta
+    alcance_pct = round(len(df_salud) / META_PROYECTO * 100, 1)
+    col1, col2, col3 = st.columns(3)
+    col1.metric("🎯 Meta del proyecto", META_PROYECTO)
+    col2.metric("👥 Personas registradas", len(df_salud))
+    col3.metric("📊 % Alcance", f"{alcance_pct}%")
+
+    fig_meta = go.Figure(go.Indicator(
+        mode="gauge+number+delta",
+        value=alcance_pct,
+        delta={"reference": 100},
+        gauge={
+            "axis": {"range": [0, 100]},
+            "bar": {"color": "#1f4e9c"},
+            "steps": [
+                {"range": [0, 50], "color": "#fce4ec"},
+                {"range": [50, 80], "color": "#fff8e1"},
+                {"range": [80, 100], "color": "#e8f5e9"},
+            ],
+            "threshold": {"line": {"color": "red", "width": 4}, "thickness": 0.75, "value": 100}
+        },
+        title={"text": "% Alcance vs Meta"}
+    ))
+    fig_meta.update_layout(height=300)
+    st.plotly_chart(fig_meta, use_container_width=True)
+
+    st.divider()
+
+    # Grupos vulnerables
+    st.markdown("## 🛡️ Inclusión de grupos vulnerables")
+    total = len(df_salud)
+    total_ninas = sum(suma_col(df_salud, c) for c in COLS_NINAS)
+    total_ninos = sum(suma_col(df_salud, c) for c in COLS_NINOS)
+
+    vuln_data = {
+        "Niñas": int(total_ninas),
+        "Niños": int(total_ninos),
+        "Embarazadas": int(suma_col(df_salud, COL_EMBARAZADAS)),
+        "Lactantes": int(suma_col(df_salud, COL_LACTANTES)),
+        "Discapacidad": int(suma_col(df_salud, COL_DISCAPACIDAD_N) + suma_col(df_salud, COL_DISCAPACIDAD_H) + suma_col(df_salud, COL_DISCAPACIDAD_M)),
+        "Adultos mayores": int(suma_col(df_salud, COL_ADULTOS_M) + suma_col(df_salud, COL_ADULTOS_H)),
+    }
+    df_vuln = pd.DataFrame(list(vuln_data.items()), columns=["Grupo", "Total"])
+    fig_vuln = px.bar(df_vuln.sort_values("Total"), x="Total", y="Grupo",
+                     orientation="h", color_discrete_sequence=["#00897b"],
+                     text="Total")
+    fig_vuln.update_traces(textposition="outside")
+    st.plotly_chart(fig_vuln, use_container_width=True)
+
+    st.divider()
+
+    # Calidad de datos
+    st.markdown("## 🔬 Calidad de datos")
+    calidad = calidad_datos(df_salud)
+    if calidad:
+        col_c1, col_c2 = st.columns(2)
+        with col_c1:
+            for campo, pct in calidad.items():
+                if pct >= 90:
+                    st.markdown(f"""<div class="alerta-nueva">✅ <strong>{campo}</strong>: {pct}% completo</div>""", unsafe_allow_html=True)
+                elif pct >= 70:
+                    st.markdown(f"""<div class="alerta-duplicado">⚠️ <strong>{campo}</strong>: {pct}% completo</div>""", unsafe_allow_html=True)
+                else:
+                    st.markdown(f"""<div class="alerta-critica">❌ <strong>{campo}</strong>: {pct}% completo — requiere atención</div>""", unsafe_allow_html=True)
+
+        with col_c2:
+            df_cal = pd.DataFrame(list(calidad.items()), columns=["Campo", "% Completitud"])
+            fig_cal = px.bar(df_cal.sort_values("% Completitud"),
+                            x="% Completitud", y="Campo", orientation="h",
+                            color="% Completitud",
+                            color_continuous_scale=["#e53935", "#ffc107", "#4caf50"],
+                            range_x=[0, 100])
+            fig_cal.update_layout(coloraxis_showscale=False)
+            st.plotly_chart(fig_cal, use_container_width=True)
+
+    st.divider()
+
+    # Tasa de consentimiento
+    if COL_CONSENTIMIENTO in df_salud.columns:
+        st.markdown("#### ✅ Tasa de consentimiento")
+        consiente = df_salud[COL_CONSENTIMIENTO].str.lower().str.strip()
+        si = (consiente == "sí").sum()
+        no = (consiente == "no").sum()
+        tasa = round(si / (si + no) * 100, 1) if (si + no) > 0 else 0
+        st.metric("% que aceptó ser entrevistado", f"{tasa}%")
+
+    st.divider()
+
+    # Cruce Salud + Call Center
+    st.markdown("## 🔗 Cruce Salud + Call Center")
+    if not df_cc.empty and "N_mero_telef_nico_de_quien_llama" in df_cc.columns and COL_TEL in df_salud.columns:
+        tels_salud = set(df_salud[COL_TEL].dropna().astype(str).str.strip())
+        tels_cc = set(df_cc["N_mero_telef_nico_de_quien_llama"].dropna().astype(str).str.strip())
+        en_ambos = tels_salud & tels_cc
+        col_cr1, col_cr2, col_cr3 = st.columns(3)
+        col_cr1.metric("📊 En base salud", len(tels_salud))
+        col_cr2.metric("📞 En call center", len(tels_cc))
+        col_cr3.metric("🔗 En ambas bases", len(en_ambos))
+        if len(en_ambos) > 0:
+            st.info(f"**{len(en_ambos)}** personas aparecen tanto en la base de salud como en el call center.")
