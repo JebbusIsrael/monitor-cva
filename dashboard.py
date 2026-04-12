@@ -796,6 +796,30 @@ if modulo == "📊 Salud / Beneficiarios":
 
     st.divider()
 
+    # ── ALIADOS QUE MÁS CANALIZAN ──
+    st.markdown("#### 🤝 Aliados que más canalizan")
+    COL_ALIADO = "Seleccione la organización a la que pertenece:"
+    if COL_ALIADO in df.columns:
+        col_al1, col_al2 = st.columns(2)
+
+    with col_al1:
+        aliados = df[COL_ALIADO].value_counts().reset_index()
+        aliados.columns = ["Aliado", "Canalizaciones"]
+        fig_al = px.bar(aliados, x="Canalizaciones", y="Aliado",
+                       orientation="h",
+                       color_discrete_sequence=["#00897b"],
+                       text="Canalizaciones")
+        fig_al.update_traces(textposition="outside")
+        fig_al.update_layout(plot_bgcolor="white")
+        st.plotly_chart(fig_al, use_container_width=True)
+
+    with col_al2:
+        if COL_ENTIDAD in df.columns:
+            st.markdown("##### Por entidad")
+            cruce_aliado = df.groupby([COL_ALIADO, COL_ENTIDAD]).size().reset_index(name="Canalizaciones")
+            cruce_aliado = cruce_aliado.sort_values("Canalizaciones", ascending=False)
+            st.dataframe(cruce_aliado.reset_index(drop=True), use_container_width=True, height=300)
+
     # ══ SECCIÓN 6: TODOS LOS REGISTROS ══
     st.markdown("## 📋 Todos los registros")
     cols_excluir = ["__version__","_tags","meta/rootUuid","_index",
