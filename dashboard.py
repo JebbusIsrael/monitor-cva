@@ -13,7 +13,7 @@ from fpdf import FPDF
 # CONFIGURACIÓN
 # ─────────────────────────────────────────────
 st.set_page_config(
-    page_title="Monitor PTM — Save the Children",
+    page_title="Monitor PTM",
     page_icon="🏥",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -168,7 +168,7 @@ if not st.session_state.autenticado:
     <div style="background:linear-gradient(90deg,#c8102e,#1f4e9c);padding:16px;
     border-radius:8px;text-align:center;color:white;margin-bottom:24px;">
     <h2 style="margin:0">🏥 Monitor PTM</h2>
-    <p style="margin:4px 0 0">Save the Children México</p>
+    <p style="margin:4px 0 0">México</p>
     </div>
     </div>
     """, unsafe_allow_html=True)
@@ -199,11 +199,11 @@ if not st.session_state.autenticado:
     💻 <strong>Dispositivos seguros</strong> — Acceda únicamente desde equipos institucionales o de confianza.
     Evite el uso en computadoras públicas o redes WiFi abiertas.<br>
     📥 <strong>Descarga de información</strong> — No descargue ni almacene datos sensibles fuera de los
-    sistemas autorizados por Save the Children.<br>
+    sistemas autorizados por la organización.<br>
     🎯 <strong>Uso exclusivo</strong> — Este sistema es para fines operativos de monitoreo de transferencias
     monetarias. Cualquier otro uso no está autorizado.<br><br>
     <em>De conformidad con la Ley Federal de Protección de Datos Personales en Posesión de los Particulares
-    y los estándares CHS de Save the Children México.</em>
+    .</em>
     </div>
     """, unsafe_allow_html=True)
     st.stop()
