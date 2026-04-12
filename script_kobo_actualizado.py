@@ -125,7 +125,7 @@ def actualizar_formulario(filename, url):
 # ─────────────────────────────────────────────
 def ejecutar_actualizaciones():
     horarios = ["08:30", "09:10", "10:00", "11:35", "12:00",
-                "12:50", "13:30", "14:10", "15:45", "16:45", "21:05"]
+                "12:50", "13:30", "14:10", "15:45", "16:45", "17:35"]
     ultima_actualizacion = None
     eliminaciones_realizadas = set()
 
