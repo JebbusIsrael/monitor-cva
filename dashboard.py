@@ -270,8 +270,12 @@ def norm_nombre(x):
 # MAPA DE CALOR
 # ─────────────────────────────────────────────
 def mostrar_mapa(df):
-    col_lugar = COL_MUNICIPIO if COL_MUNICIPIO in df.columns else COL_ENTIDAD
-    if col_lugar not in df.columns:
+    # Usar entidad como base, municipio como complemento
+    if COL_ENTIDAD in df.columns and df[COL_ENTIDAD].notna().sum() > 0:
+        col_lugar = COL_ENTIDAD
+    elif COL_MUNICIPIO in df.columns and df[COL_MUNICIPIO].notna().sum() > 0:
+        col_lugar = COL_MUNICIPIO
+    else:
         st.warning("No se encontró columna de municipio o entidad.")
         return
 
@@ -855,9 +859,9 @@ elif modulo == "📞 Call Center":
 
     st.divider()
 
-    st.markdown("#### 📆 Casos últimos 7 días")
+    st.markdown("#### 📆 Casos últimos 14 días")
     if COL_FECHA in df_cc.columns:
-        ultimos_7 = [(hoy - timedelta(days=i)) for i in range(6, -1, -1)]
+        ultimos_7 = [(hoy - timedelta(days=i)) for i in range(13, -1, -1)]
         conteos_cc = [{"Día": fecha_es(d),
                        "Casos": len(df_cc[df_cc[COL_FECHA].dt.date == d]),
                        "Hoy": d == hoy} for d in ultimos_7]
