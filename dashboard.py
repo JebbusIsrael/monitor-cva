@@ -144,6 +144,7 @@ config = {
     },
     "cookie": {"expiry_days": 1, "key": "monitor_cva_stc", "name": "monitor_cva_cookie"},
 }
+
 # ─────────────────────────────────────────────
 # LOGIN PROPIO (sin cookies externas)
 # ─────────────────────────────────────────────
@@ -626,9 +627,9 @@ if modulo == "📊 Salud / Beneficiarios":
     st.divider()
 
     # Últimos 7 días
-    st.markdown("#### 📆 Registros últimos 7 días")
+    st.markdown("#### 📆 Registros últimos 9 días")
     if COL_FECHA in df.columns:
-        ultimos_7 = [(hoy - timedelta(days=i)) for i in range(6, -1, -1)]
+        ultimos_7 = [(hoy - timedelta(days=i)) for i in range(8, -1, -1)]
         conteos = [{"Día": fecha_es(d), "Fecha": d,
                     "Registros": len(df[df[COL_FECHA].dt.date == d]),
                     "Hoy": d == hoy} for d in ultimos_7]
@@ -864,17 +865,30 @@ elif modulo == "📞 Call Center":
     if len(cc_hoy) > 0:
         st.markdown(f"""<div class="alerta-nueva">🟢 <strong>{len(cc_hoy)} nuevos casos hoy</strong> — {fecha_es(hoy)}</div>""", unsafe_allow_html=True)
 
-    col1, col2, col3 = st.columns(3)
+    # Casos sin solución registrada (últimos 28 días)
+    fecha_28 = hoy - timedelta(days=28)
+    df_cc_28 = df_cc[df_cc[COL_FECHA].dt.date >= fecha_28] if COL_FECHA in df_cc.columns else df_cc
+    sin_solucion = df_cc_28[
+        df_cc_28[COL_SOL_CC].isna() | (df_cc_28[COL_SOL_CC].astype(str).str.strip() == "")
+    ] if COL_SOL_CC in df_cc_28.columns else pd.DataFrame()
+
+    if len(sin_solucion) > 0:
+        st.markdown(f'''<div class="alerta-critica">
+            ⚠️ <strong>{len(sin_solucion)} casos sin solución registrada</strong> en las últimas 4 semanas — requieren seguimiento.
+        </div>''', unsafe_allow_html=True)
+
+    col1, col2, col3, col4 = st.columns(4)
     col1.metric("📋 Total casos", len(df_cc))
     col2.metric("🆕 Casos hoy", len(cc_hoy))
+    col3.metric("⚠️ Sin solución (28 días)", len(sin_solucion))
     if COL_CIUDAD_CC in df_cc.columns:
-        col3.metric("🏙 Ciudades", df_cc[COL_CIUDAD_CC].nunique())
+        col4.metric("🏙 Ciudades", df_cc[COL_CIUDAD_CC].nunique())
 
     st.divider()
 
-    st.markdown("#### 📆 Casos últimos 14 días")
+    st.markdown("#### 📆 Casos últimas 4 semanas (28 días)")
     if COL_FECHA in df_cc.columns:
-        ultimos_7 = [(hoy - timedelta(days=i)) for i in range(13, -1, -1)]
+        ultimos_7 = [(hoy - timedelta(days=i)) for i in range(27, -1, -1)]
         conteos_cc = [{"Día": fecha_es(d),
                        "Casos": len(df_cc[df_cc[COL_FECHA].dt.date == d]),
                        "Hoy": d == hoy} for d in ultimos_7]
@@ -921,9 +935,9 @@ elif modulo == "📞 Call Center":
     st.divider()
 
     # ── ÚLTIMOS 15 DÍAS DETALLE ──
-    st.markdown("#### 📋 Casos últimos 15 días — detalle por fecha y oficina")
+    st.markdown("#### 📋 Casos últimas 4 semanas — detalle por fecha y oficina")
     if COL_FECHA in df_cc.columns:
-        fecha_corte_15 = hoy - timedelta(days=15)
+        fecha_corte_15 = hoy - timedelta(days=28)
         df_cc_15 = df_cc[df_cc[COL_FECHA].dt.date >= fecha_corte_15].copy()
         df_cc_15 = df_cc_15.sort_values(COL_FECHA, ascending=False)
 
@@ -952,8 +966,8 @@ elif modulo == "📞 Call Center":
     st.divider()
 
     # ══ CRUCE SALUD + CALL CENTER ══
-    st.markdown("## 🔗 Cruce — Personas de salud en call center (últimos 14 días)")
-    st.caption("Beneficiarios de la base de salud que también contactaron al call center en los últimos 14 días.")
+    st.markdown("## 🔗 Cruce — Personas de salud en call center (últimas 4 semanas)")
+    st.caption("Beneficiarios de la base de salud que también contactaron al call center en las últimas 4 semanas.")
 
     if not df_salud.empty and COL_TEL in df_salud.columns and COL_TEL_CC in df_cc.columns:
         def norm_t(x):
@@ -984,7 +998,7 @@ elif modulo == "📞 Call Center":
 
         col1, col2, col3 = st.columns(3)
         col1.metric("👥 En base salud", len(df_s))
-        col2.metric("📞 Call center 14 días", len(df_c14))
+        col2.metric("📞 Call center 28 días", len(df_c14))
         col3.metric("🔗 En ambas bases", len(personas_cruce))
 
         if len(personas_cruce) == 0:
