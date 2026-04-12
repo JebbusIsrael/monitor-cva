@@ -133,16 +133,48 @@ st.markdown("""
 config = {
     "credentials": {
         "usernames": {
-            "Monitoreo_admin": {"name": "Monitoreo", "password": "$2b$12$HASH_ADMIN_AQUI", "role": "admin"},
-            "tijuana": {"name": "Equipo Tijuana", "password": "$2b$12$HASH_TIJUANA_AQUI", "role": "operator"},
-            "oaxaca": {"name": "Equipo Oaxaca", "password": "$2b$12$HASH_OAXACA_AQUI", "role": "operator"},
-            "cdmx": {"name": "Equipo CDMX", "password": "$2b$12$HASH_CDMX_AQUI", "role": "operator"},
-            "tapachula": {"name": "Equipo Tapachula", "password": "$2b$12$HASH_TAPACHULA_AQUI", "role": "operator"},
-            "tamaulipas": {"name": "Equipo Tamaulipas", "password": "$2b$12$HASH_TAMAULIPAS_AQUI", "role": "operator"},
-            "tabasco": {"name": "Equipo Tabasco", "password": "$2b$12$HASH_TABASCO_AQUI", "role": "operator"},
+            "tijuana": {
+                "name": "Equipo Tijuana",
+                "password": "$2b$12$BhOVLaSzAurxpX3E2tBj/.nysVwxEmgds8GrN9vZDL9nLAQy0hC9u",
+                "role": "operator",
+            },
+            "oaxaca": {
+                "name": "Equipo Oaxaca",
+                "password": "$2b$12$QNoD66.3qsTDGHq6FqiR8.u2sbTNIyQzcGrEtsSqkZtH176nNw8Ke",
+                "role": "operator",
+            },
+            "cdmx": {
+                "name": "Equipo CDMX",
+                "password": "$2b$12$xp1Cn5nCKLGiZQikf0WqBeqs6crp3tPRtF9ab7S92kNPBc8Xe4TSe",
+                "role": "operator",
+            },
+            "tapachula": {
+                "name": "Equipo Tapachula",
+                "password": "$2b$12$Reco9TLppZJCBXfWbuokWOTKNSnF6WpJodfLYpiFkuMtIxVljQn3q",
+                "role": "operator",
+            },
+            "tamaulipas": {
+                "name": "Equipo Tamaulipas",
+                "password": "$2b$12$VF2x0pO2QnjXj/jDatDDVOjK3cCkBRsCLFhKFVRaP5CmmUu1SVrBC",
+                "role": "operator",
+            },
+            "tabasco": {
+                "name": "Equipo Tabasco",
+                "password": "$2b$12$8VpQpbLRQitjhh1iX0Sa/.7Bvyv8KaTxpwPC0LB6QKEgSndVvTzVa",
+                "role": "operator",
+            },
+            "Monitoreo_admin": {
+                "name": "Monitoreo",
+                "password": "$2b$12$Lquzvyq6SYH0zJp4nnVRj.KZkJ7VIp2Y0RYRphVjev3nMPmRpfERe",
+                "role": "admin",
+            },
         }
     },
-    "cookie": {"expiry_days": 1, "key": "monitor_cva_stc", "name": "monitor_cva_cookie"},
+    "cookie": {
+        "expiry_days": 1,
+        "key": "monitor_cva_stc",
+        "name": "monitor_cva_cookie",
+    },
 }
 
 # ─────────────────────────────────────────────
