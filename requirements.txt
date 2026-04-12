@@ -8,4 +8,4 @@ pyyaml
 bcrypt
 requests
 fpdf2
-extra-streamlit-components==0.1.60
+extra-streamlit-components==0.1.71
