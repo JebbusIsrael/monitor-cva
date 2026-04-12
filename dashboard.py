@@ -188,6 +188,24 @@ if not st.session_state.autenticado:
                 st.rerun()
             else:
                 st.error("Usuario o contraseña incorrectos.")
+
+    st.markdown("""
+    <div style="margin-top:16px; padding:12px; background:#fff8e1; border-left:4px solid #ff9800;
+    border-radius:8px; font-size:12px; color:#555;">
+    <strong>⚠️ Aviso de privacidad y uso responsable</strong><br><br>
+    Al acceder a este sistema usted acepta las siguientes condiciones:<br>
+    🔒 <strong>Confidencialidad</strong> — La información de beneficiarios es estrictamente confidencial.
+    No comparta sus credenciales ni el contenido del dashboard con personas no autorizadas.<br>
+    💻 <strong>Dispositivos seguros</strong> — Acceda únicamente desde equipos institucionales o de confianza.
+    Evite el uso en computadoras públicas o redes WiFi abiertas.<br>
+    📥 <strong>Descarga de información</strong> — No descargue ni almacene datos sensibles fuera de los
+    sistemas autorizados por Save the Children.<br>
+    🎯 <strong>Uso exclusivo</strong> — Este sistema es para fines operativos de monitoreo de transferencias
+    monetarias. Cualquier otro uso no está autorizado.<br><br>
+    <em>De conformidad con la Ley Federal de Protección de Datos Personales en Posesión de los Particulares
+    y los estándares CHS de Save the Children México.</em>
+    </div>
+    """, unsafe_allow_html=True)
     st.stop()
 
 name = st.session_state.name
@@ -810,7 +828,85 @@ if modulo == "📊 Salud / Beneficiarios":
 
     st.divider()
 
-    # ══ SECCIÓN 6: TODOS LOS REGISTROS ══
+    # ══ SECCIÓN 6: BÚSQUEDA Y TODOS LOS REGISTROS ══
+    st.markdown("## 🔍 Búsqueda de beneficiarios")
+
+    col_busq1, col_busq2, col_busq3 = st.columns(3)
+    with col_busq1:
+        busq_nombre = st.text_input("🔎 Buscar por nombre", placeholder="Escribe el nombre...")
+    with col_busq2:
+        busq_tel = st.text_input("📱 Buscar por teléfono", placeholder="Escribe el número...")
+    with col_busq3:
+        busq_pais = st.text_input("🌍 Buscar por país", placeholder="Ej: Venezuela...")
+
+    # Aplicar filtros de búsqueda
+    df_busq = df.copy()
+    filtros_activos = []
+
+    if busq_nombre.strip():
+        if COL_NOMBRE in df_busq.columns:
+            df_busq = df_busq[df_busq[COL_NOMBRE].astype(str).str.lower().str.contains(
+                busq_nombre.strip().lower(), na=False)]
+        filtros_activos.append(f"Nombre: '{busq_nombre}'")
+
+    if busq_tel.strip():
+        if COL_TEL in df_busq.columns:
+            df_busq = df_busq[df_busq[COL_TEL].astype(str).str.contains(
+                busq_tel.strip(), na=False)]
+        filtros_activos.append(f"Teléfono: '{busq_tel}'")
+
+    if busq_pais.strip():
+        if COL_PAIS in df_busq.columns:
+            df_busq = df_busq[df_busq[COL_PAIS].astype(str).str.lower().str.contains(
+                busq_pais.strip().lower(), na=False)]
+        filtros_activos.append(f"País: '{busq_pais}'")
+
+    if filtros_activos:
+        st.caption(f"🔍 Filtros activos: {' | '.join(filtros_activos)} — **{len(df_busq)}** resultados")
+
+        if len(df_busq) == 0:
+            st.warning("No se encontraron resultados para esa búsqueda.")
+        else:
+            cols_excluir = ["__version__","_tags","meta/rootUuid","_index",
+                           "_notes","_status","_submitted_by","_validation_status"]
+            cols_busq = [COL_NOMBRE, COL_TEL, COL_EDAD, COL_SEXO, COL_PAIS,
+                        COL_ENTIDAD, COL_MUNICIPIO, "tarjetas_requeridas",
+                        COL_ESPECIALIDAD, COL_FECHA]
+            if rol not in ["operator","admin"]:
+                cols_busq = [c for c in cols_busq if c not in COLS_PII]
+            cols_busq_disp = [c for c in cols_busq if c in df_busq.columns]
+
+            # Si es un solo resultado mostrar detalle completo
+            if len(df_busq) == 1:
+                st.success("✅ 1 registro encontrado")
+                persona = df_busq.iloc[0]
+                col_det1, col_det2 = st.columns(2)
+                with col_det1:
+                    st.markdown("**Datos personales:**")
+                    for campo, col in [("Nombre", COL_NOMBRE), ("Teléfono", COL_TEL),
+                                       ("Edad", COL_EDAD), ("Sexo", COL_SEXO),
+                                       ("País", COL_PAIS), ("Entidad", COL_ENTIDAD),
+                                       ("Municipio", COL_MUNICIPIO)]:
+                        if col in persona.index and pd.notna(persona[col]):
+                            if col not in COLS_PII or rol in ["operator","admin"]:
+                                st.write(f"**{campo}:** {persona[col]}")
+                with col_det2:
+                    st.markdown("**Servicios requeridos:**")
+                    if "tarjetas_requeridas" in persona.index:
+                        servicios = persona.get("tarjetas_requeridas", "")
+                        if servicios:
+                            for s in str(servicios).split(" | "):
+                                st.write(f"• {s}")
+                    if COL_ESPECIALIDAD in persona.index and pd.notna(persona.get(COL_ESPECIALIDAD)):
+                        st.write(f"**Especialidad:** {persona[COL_ESPECIALIDAD]}")
+                    if COL_FECHA in persona.index:
+                        st.write(f"**Fecha registro:** {persona[COL_FECHA]}")
+            else:
+                st.dataframe(df_busq[cols_busq_disp].reset_index(drop=True),
+                            use_container_width=True, height=350)
+
+    st.divider()
+
     st.markdown("## 📋 Todos los registros")
     cols_excluir = ["__version__","_tags","meta/rootUuid","_index",
                    "_notes","_status","_submitted_by","_validation_status"]
