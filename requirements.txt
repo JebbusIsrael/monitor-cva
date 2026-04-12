@@ -1,5 +1,5 @@
 streamlit
-streamlit-authenticator
+streamlit-authenticator==0.3.3
 cryptography
 pandas
 plotly
@@ -8,3 +8,4 @@ pyyaml
 bcrypt
 requests
 fpdf2
+extra-streamlit-components==0.1.60
