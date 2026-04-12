@@ -133,18 +133,17 @@ st.markdown("""
 config = {
     "credentials": {
         "usernames": {
-            "Monitoreo_admin": {"name": "Monitoreo", "password": "$2b$12$Lquzvyq6SYH0zJp4nnVRj.KZkJ7VIp2Y0RYRphVjev3nMPmRpfERe", "role": "admin"},
-            "tijuana": {"name": "Equipo Tijuana", "password": "$2b$12$BhOVLaSzAurxpX3E2tBj/.nysVwxEmgds8GrN9vZDL9nLAQy0hC9u", "role": "operator"},
-            "oaxaca": {"name": "Equipo Oaxaca", "password": "$2b$12$QNoD66.3qsTDGHq6FqiR8.u2sbTNIyQzcGrEtsSqkZtH176nNw8Ke", "role": "operator"},
-            "cdmx": {"name": "Equipo CDMX", "password": "$2b$12$xp1Cn5nCKLGiZQikf0WqBeqs6crp3tPRtF9ab7S92kNPBc8Xe4TSe", "role": "operator"},
-            "tapachula": {"name": "Equipo Tapachula", "password": "$2b$12$Reco9TLppZJCBXfWbuokWOTKNSnF6WpJodfLYpiFkuMtIxVljQn3q", "role": "operator"},
-            "tamaulipas": {"name": "Equipo Tamaulipas", "password": "$2b$12$VF2x0pO2QnjXj/jDatDDVOjK3cCkBRsCLFhKFVRaP5CmmUu1SVrBC", "role": "operator"},
-            "tabasco": {"name": "Equipo Tabasco", "password": "$2b$12$8VpQpbLRQitjhh1iX0Sa/.7Bvyv8KaTxpwPC0LB6QKEgSndVvTzVa", "role": "operator"},
+            "Monitoreo_admin": {"name": "Monitoreo", "password":"$2b$12$Lquzvyq6SYH0zJp4nnVRj.KZkJ7VIp2Y0RYRphVjev3nMPmRpfERe", "role": "admin"},
+            "Tijuana": {"name": "Equipo Tijuana", "password":"$2b$12$BhOVLaSzAurxpX3E2tBj/.nysVwxEmgds8GrN9vZDL9nLAQy0hC9u", "role": "operator"},
+            "Oaxaca": {"name": "Equipo Oaxaca", "password":"$2b$12$QNoD66.3qsTDGHq6FqiR8.u2sbTNIyQzcGrEtsSqkZtH176nNw8Ke", "role": "operator"},
+            "CDMX": {"name": "Equipo CDMX", "password":"$2b$12$xp1Cn5nCKLGiZQikf0WqBeqs6crp3tPRtF9ab7S92kNPBc8Xe4TSe", "role": "operator"},
+            "Tapachula": {"name": "Equipo Tapachula", "password":"$2b$12$Reco9TLppZJCBXfWbuokWOTKNSnF6WpJodfLYpiFkuMtIxVljQn3q", "role": "operator"},
+            "Tamaulipas": {"name": "Equipo Tamaulipas", "password":"$2b$12$VF2x0pO2QnjXj/jDatDDVOjK3cCkBRsCLFhKFVRaP5CmmUu1SVrBC", "role": "operator"},
+            "Tabasco": {"name": "Equipo Tabasco", "password":"$2b$12$8VpQpbLRQitjhh1iX0Sa/.7Bvyv8KaTxpwPC0LB6QKEgSndVvTzVa", "role": "operator"},
         }
     },
     "cookie": {"expiry_days": 1, "key": "monitor_cva_stc", "name": "monitor_cva_cookie"},
 }
-
 # ─────────────────────────────────────────────
 # LOGIN PROPIO (sin cookies externas)
 # ─────────────────────────────────────────────
@@ -644,11 +643,16 @@ if modulo == "📊 Salud / Beneficiarios":
 
         cols_tabla = [COL_NOMBRE, COL_EDAD, COL_SEXO, COL_PAIS,
                      COL_ENTIDAD, COL_MUNICIPIO, "tarjetas_requeridas", COL_FECHA]
-        # COL_ENTIDAD ya incluido — identifica inmediatamente de qué oficina es
         for item in reversed(conteos):
             d = item["Fecha"]
             reg = df[df[COL_FECHA].dt.date == d]
-            label = f"{'🟢 Hoy' if d == hoy else fecha_es(d)} — {len(reg)} registros"
+            if len(reg) > 0 and COL_ENTIDAD in reg.columns:
+                oficinas_dia = reg[COL_ENTIDAD].dropna().value_counts()
+                resumen_of = " | ".join([f"{of}: {n}" for of, n in oficinas_dia.items()])
+            else:
+                resumen_of = "sin registros"
+            prefix = "🟢 Hoy" if d == hoy else fecha_es(d)
+            label = f"{prefix} — {len(reg)} registros  ·  {resumen_of}"
             with st.expander(label, expanded=(d == hoy)):
                 if len(reg) == 0:
                     st.info("Sin registros este día.")
@@ -944,6 +948,84 @@ elif modulo == "📞 Call Center":
         cols_cc_ver = [c for c in todas_cc if c not in [COL_NOMBRE_CC, COL_TEL_CC]]
     st.dataframe(df_cc[cols_cc_ver].reset_index(drop=True), use_container_width=True, height=300)
 
+
+    st.divider()
+
+    # ══ CRUCE SALUD + CALL CENTER ══
+    st.markdown("## 🔗 Cruce — Personas de salud en call center (últimos 14 días)")
+    st.caption("Beneficiarios de la base de salud que también contactaron al call center en los últimos 14 días.")
+
+    if not df_salud.empty and COL_TEL in df_salud.columns and COL_TEL_CC in df_cc.columns:
+        def norm_t(x):
+            return str(x).strip().replace("-","").replace(" ","").replace("+52","") if pd.notna(x) else ""
+        def norm_n(x):
+            return str(x).strip().lower() if pd.notna(x) else ""
+
+        fecha_corte_14 = hoy - timedelta(days=14)
+        df_s = df_salud.copy()
+        df_c14 = df_cc.copy()
+        if COL_FECHA in df_c14.columns:
+            df_c14 = df_c14[df_c14[COL_FECHA].dt.date >= fecha_corte_14]
+
+        df_s["tel_norm"] = df_s[COL_TEL].apply(norm_t)
+        df_s["nom_norm"] = df_s[COL_NOMBRE].apply(norm_n) if COL_NOMBRE in df_s.columns else ""
+        df_c14["tel_norm"] = df_c14[COL_TEL_CC].apply(norm_t)
+        df_c14["nom_norm"] = df_c14[COL_NOMBRE_CC].apply(norm_n) if COL_NOMBRE_CC in df_c14.columns else ""
+
+        tels_cc = set(df_c14[df_c14["tel_norm"] != ""]["tel_norm"])
+        noms_cc = set(df_c14[df_c14["nom_norm"].str.len() > 3]["nom_norm"])
+
+        mask = (
+            df_s["tel_norm"].isin(tels_cc) & (df_s["tel_norm"] != "")
+        ) | (
+            df_s["nom_norm"].isin(noms_cc) & (df_s["nom_norm"].str.len() > 3)
+        )
+        personas_cruce = df_s[mask]
+
+        col1, col2, col3 = st.columns(3)
+        col1.metric("👥 En base salud", len(df_s))
+        col2.metric("📞 Call center 14 días", len(df_c14))
+        col3.metric("🔗 En ambas bases", len(personas_cruce))
+
+        if len(personas_cruce) == 0:
+            st.success("✅ Sin personas en ambas bases en los últimos 14 días.")
+        else:
+            st.markdown(f'''<div class="cruce-card">
+                🔗 <strong>{len(personas_cruce)} personas</strong> de salud también contactaron call center en los últimos 14 días.
+            </div>''', unsafe_allow_html=True)
+
+            filas = []
+            for _, persona in personas_cruce.iterrows():
+                tel = persona.get("tel_norm", "")
+                nom = persona.get("nom_norm", "")
+                casos = df_c14[
+                    ((df_c14["tel_norm"] == tel) & (tel != "")) |
+                    ((df_c14["nom_norm"] == nom) & (nom != "") & (df_c14["nom_norm"].str.len() > 3))
+                ]
+                for _, caso in casos.iterrows():
+                    fila = {
+                        "Fecha caso": caso.get(COL_FECHA, ""),
+                        "Ciudad": caso.get(COL_CIUDAD_CC, ""),
+                        "Problema": caso.get(COL_PROBLEMA_CC, ""),
+                        "Descripción": caso.get(COL_DESC_CC, ""),
+                        "Solución": caso.get(COL_SOL_CC, ""),
+                        "Oficina salud": persona.get(COL_ENTIDAD, ""),
+                        "Sexo": persona.get(COL_SEXO, ""),
+                        "Edad": persona.get(COL_EDAD, ""),
+                        "País": persona.get(COL_PAIS, ""),
+                    }
+                    if rol in ["operator", "admin"]:
+                        fila["Nombre"] = persona.get(COL_NOMBRE, "")
+                        fila["Teléfono"] = persona.get(COL_TEL, "")
+                    filas.append(fila)
+
+            if filas:
+                df_tc = pd.DataFrame(filas).sort_values("Fecha caso", ascending=False)
+                st.caption(f"**{len(filas)}** casos vinculados entre salud y call center")
+                st.dataframe(df_tc.reset_index(drop=True), use_container_width=True, height=450)
+    else:
+        st.info("Se necesitan datos de salud y call center para mostrar el cruce.")
+
 # ═══════════════════════════════════════════════════════
 # MÓDULO 3: MEAL & CALIDAD
 # ═══════════════════════════════════════════════════════
@@ -983,9 +1065,4 @@ elif modulo == "📋 MEAL & Calidad":
         fig_cal.update_layout(coloraxis_showscale=False)
         st.plotly_chart(fig_cal, use_container_width=True)
 
-    st.divider()
 
-    # Cruce Salud + Call Center
-    st.markdown("## 🔗 Cruce Salud + Call Center")
-    st.caption("Personas que aparecen en la base de salud Y también contactaron al call center — por nombre y teléfono.")
-    mostrar_cruce(df_salud, df_cc, rol)
