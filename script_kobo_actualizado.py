@@ -59,16 +59,79 @@ def cifrar_y_guardar(df: pd.DataFrame, nombre_archivo: str):
 
     print(f"🔐 Archivo cifrado guardado: {nombre_enc}")
 
-    # ── NUEVO: copiar .enc al repo y subir a GitHub ──
-    ruta_repo = os.path.join(r"C:\Users\Pc\Desktop\sabad", nombre_enc)
-    import shutil
-    shutil.copy(ruta_enc, ruta_repo)
-    
-    os.chdir(r"C:\Users\Pc\Desktop\sabad")
-    os.system(f'git add {nombre_enc}')
-    os.system('git commit -m "Actualización datos cifrados"')
-    os.system('git push origin master')
-    print(f"🚀 {nombre_enc} subido a GitHub")
+
+# ─────────────────────────────────────────────
+# NORMALIZACIÓN DE DATOS
+# ─────────────────────────────────────────────
+def normalizar_df(df: pd.DataFrame) -> pd.DataFrame:
+    """Normaliza inconsistencias de mayúsculas y formatos en columnas clave."""
+
+    # Mapeo de valores incorrectos → correctos
+    PAIS_MAP = {
+        "m_xico": "México", "mexico": "México", "Mexico": "México",
+        "M Xico": "México", "m xico": "México",
+        "option_1": "México",
+        "venezuela": "Venezuela",
+        "colombia": "Colombia",
+        "guatemala": "Guatemala",
+        "honduras": "Honduras",
+        "el_salvador": "El Salvador", "el salvador": "El Salvador",
+        "cuba": "Cuba",
+        "haiti": "Haití", "haití": "Haití",
+        "nicaragua": "Nicaragua",
+        "ecuador": "Ecuador",
+        "peru": "Perú", "perú": "Perú",
+        "nan": None, "None": None,
+    }
+
+    ENTIDAD_MAP = {
+        "oaxaca": "Oaxaca",
+        "baja_california": "Baja California",
+        "tamaulipas": "Tamaulipas",
+        "chiapas": "Chiapas",
+        "tabasco": "Tabasco",
+        "ciudad_de_m_xico": "Ciudad de México",
+        "ciudad de m xico": "Ciudad de México",
+        "guerrero": "Guerrero",
+        "chihuahua": "Chihuahua",
+        "nan": None, "None": None,
+    }
+
+    SEXO_MAP = {
+        "mujer": "Mujer",
+        "hombre": "Hombre",
+        "otro": "Otro",
+        "nan": None, "None": None,
+    }
+
+    # Aplicar normalización
+    col_pais = "País de origen"
+    if col_pais in df.columns:
+        df[col_pais] = df[col_pais].astype(str).str.strip()
+        df[col_pais] = df[col_pais].replace(PAIS_MAP)
+        df[col_pais] = df[col_pais].apply(
+            lambda x: None if str(x).lower() in ["nan", "none", ""] else x
+        )
+
+    col_entidad = "Selecciona la entidad federativa en la que te encuentras"
+    if col_entidad in df.columns:
+        df[col_entidad] = df[col_entidad].astype(str).str.strip()
+        df[col_entidad] = df[col_entidad].str.replace("_", " ")
+        df[col_entidad] = df[col_entidad].replace(ENTIDAD_MAP)
+        df[col_entidad] = df[col_entidad].apply(
+            lambda x: None if str(x).lower() in ["nan", "none", ""] else x
+        )
+
+    col_sexo = "Sexo"
+    if col_sexo in df.columns:
+        df[col_sexo] = df[col_sexo].astype(str).str.strip()
+        df[col_sexo] = df[col_sexo].replace(SEXO_MAP)
+        df[col_sexo] = df[col_sexo].apply(
+            lambda x: None if str(x).lower() in ["nan", "none", ""] else x
+        )
+
+    print("🧹 Datos normalizados correctamente.")
+    return df
 
 
 # ─────────────────────────────────────────────
@@ -110,7 +173,8 @@ def actualizar_formulario(filename, url):
             df.to_excel(file_path, index=False)
             print(f"✅ [{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {filename} actualizado en OneDrive.")
 
-            # ── NUEVO: cifrar y guardar versión para el dashboard ──
+            # ── NUEVO: normalizar y cifrar para el dashboard ──
+            df = normalizar_df(df)
             cifrar_y_guardar(df, filename)
 
         else:
@@ -125,7 +189,7 @@ def actualizar_formulario(filename, url):
 # ─────────────────────────────────────────────
 def ejecutar_actualizaciones():
     horarios = ["08:30", "09:10", "10:00", "11:35", "12:00",
-                "12:50", "13:30", "14:10", "15:45", "16:45", "17:35"]
+                "12:50", "13:30", "14:10", "15:45", "16:45", "21:05"]
     ultima_actualizacion = None
     eliminaciones_realizadas = set()
 
